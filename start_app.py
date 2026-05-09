@@ -211,7 +211,7 @@ st.set_page_config(
 # ========== ЗАГОЛОВОК С ЛОГОТИПОМ (ЦЕНТР, логотип сверху) ==========
 col1, col2, col3 = st.columns([1, 2, 1])
 with col2:
-    col_logo, col_text, col_empty = st.columns([2.5, 3, 1])
+    col_logo, col_text, col_empty = st.columns([2.5, 3, 0.5])
     st.image("89120564-6.png", width=300)
     st.markdown("<h1 style='text-align: center; margin-top: -90px;'>Калькулятор от Gazminer</h1>", unsafe_allow_html=True)
     with col_empty:
