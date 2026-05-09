@@ -3,9 +3,7 @@ import pandas as pd
 import requests
 import time
 from datetime import datetime, timedelta
-# Инициализация флага для плавающей кнопки
-if 'trigger_calculation' not in st.session_state:
-    st.session_state.trigger_calculation = False
+
 # Настройки API
 API_CONFIG = {
     "coingecko": {
@@ -42,6 +40,9 @@ if 'current_results' not in st.session_state:
 
 if 'scenarios' not in st.session_state:
     st.session_state.scenarios = []
+
+if 'trigger_calculation' not in st.session_state:
+    st.session_state.trigger_calculation = False
 
 # --- Функции для работы с API ---
 def get_cached_data(key):
@@ -211,6 +212,62 @@ st.set_page_config(
     layout="wide"
 )
 
+# ========== ПЛАВАЮЩАЯ КНОПКА (CSS + HTML) ==========
+st.markdown("""
+<style>
+.floating-calc-btn {
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    z-index: 99999;
+    background: linear-gradient(135deg, #f7931a, #ffb347);
+    color: white;
+    border: none;
+    padding: 14px 28px;
+    border-radius: 50px;
+    font-size: 18px;
+    font-weight: bold;
+    cursor: pointer;
+    box-shadow: 0 4px 20px rgba(247, 147, 26, 0.5);
+    transition: all 0.3s ease;
+    text-align: center;
+    font-family: inherit;
+    animation: pulse 2s infinite;
+}
+.floating-calc-btn:hover {
+    transform: scale(1.05);
+    box-shadow: 0 6px 25px rgba(247, 147, 26, 0.7);
+    background: linear-gradient(135deg, #ffb347, #f7931a);
+}
+@keyframes pulse {
+    0% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.05); opacity: 0.95; }
+    100% { transform: scale(1); opacity: 1; }
+}
+@media (max-width: 768px) {
+    .floating-calc-btn {
+        padding: 10px 20px;
+        font-size: 14px;
+        bottom: 20px;
+        right: 20px;
+    }
+}
+</style>
+
+<button class="floating-calc-btn" onclick="
+    var btns = document.querySelectorAll('button');
+    for(var i=0; i<btns.length; i++) {
+        if(btns[i].innerText.indexOf('Рассчитать') !== -1) {
+            btns[i].click();
+            break;
+        }
+    }
+">
+    🔄 РАССЧИТАТЬ
+</button>
+""", unsafe_allow_html=True)
+# ===================================================
+
 tab1, tab2 = st.tabs(["Калькулятор", "Сохраненные результаты"])
 
 with tab1:
@@ -321,75 +378,28 @@ with tab1:
         if st.button("➕ Добавить период"):
             add_scenario()
             st.rerun()
-  # ========== ПЛАВАЮЩАЯ КНОПКА ==========
-        st.markdown("""
-        <style>
-        .float-btn-container {
-            position: fixed;
-            top: 70px;
-            right: 20px;
-            z-index: 99999;
-        }
-        .custom-float-btn {
-            background: linear-gradient(135deg, #f7931a, #ffb347);
-            color: white;
-            border: none;
-            padding: 10px 24px;
-            border-radius: 30px;
-            font-size: 16px;
-            font-weight: bold;
-            cursor: pointer;
-            box-shadow: 0 4px 15px rgba(247, 147, 26, 0.4);
-            transition: all 0.3s ease;
-            width: 100%;
-            text-align: center;
-        }
-        .custom-float-btn:hover {
-            transform: scale(1.05);
-            box-shadow: 0 6px 20px rgba(247, 147, 26, 0.6);
-        }
-        @keyframes pulse {
-            0% { opacity: 1; }
-            50% { opacity: 0.85; }
-            100% { opacity: 1; }
-        }
-        .custom-float-btn {
-            animation: pulse 2s infinite;
-        }
-        </style>
-        <div class="float-btn-container">
-            <button class="custom-float-btn" onclick="
-                var btns = document.querySelectorAll('button');
-                for(var i=0; i<btns.length; i++) {
-                    if(btns[i].innerText.indexOf('Рассчитать') !== -1 && btns[i].getAttribute('kind') === 'primary') {
-                        btns[i].click();
-                        break;
-                    }
-                }
-            ">
-                🔄 РАСЧЕТ
-            </button>
-        </div>
-        """, unsafe_allow_html=True)
-        # =====================================
-    if st.button("🔄 Рассчитать", type="primary", use_container_width=True, key="calculate_btn"):
+
+    # ОСНОВНАЯ КНОПКА РАСЧЕТА (скрыта, но нужна для работы)
+    if st.button("🔄 Рассчитать", type="primary", key="calculate_btn", use_container_width=True):
+        st.session_state.trigger_calculation = True
+    
+    # Логика расчета (вынесена отдельно)
+    if st.session_state.trigger_calculation:
+        st.session_state.trigger_calculation = False
         with st.spinner("Выполняю расчет..."):
             usd_rub = get_usd_rub_rate()
             btc_usd = get_btc_price()
             electricity_usd = electricity / usd_rub
             
-            # Преобразуем прогнозы в реальные значения
-            forecast_btc_price_usd = forecast_btc_price * 1000  # 150 тыс -> 150 000
+            forecast_btc_price_usd = forecast_btc_price * 1000
             forecast_usd_rub_rate = forecast_usd_rub
             
-            # Получаем данные с whattomine для 1 ASIC
             mining_data_per_asic = get_mining_data_with_retry(
                 asic_hashrate,
                 asic_power,
                 electricity_usd
             )
             
-            # Базовые значения для 1 ASIC
             daily_revenue_per_asic_usd = mining_data_per_asic["daily_revenue"]
             daily_profit_per_asic_usd = mining_data_per_asic["daily_profit"]
             daily_cost_per_asic_usd = daily_revenue_per_asic_usd - daily_profit_per_asic_usd
@@ -397,7 +407,6 @@ with tab1:
             daily_revenue_per_asic_rub = daily_revenue_per_asic_usd * usd_rub
             daily_cost_per_asic_rub = daily_cost_per_asic_usd * usd_rub
             
-            # Инициализация
             current_asics = asic_count
             savings = 0
             wallet_btc = 0
@@ -430,31 +439,20 @@ with tab1:
                 
                 current_date = start_date + pd.DateOffset(months=month)
                 
-                # ДОХОД (брутто) - то что намайнили
                 revenue = daily_revenue_per_asic_rub * 30 * current_asics
                 
-                # Рост сложности
                 difficulty_multiplier = (1 + difficulty_growth) ** (month - 1)
                 revenue = revenue / difficulty_multiplier if difficulty_multiplier > 0 else revenue
                 
-                # ХАЛВИНГ - ЕСЛИ ТЕКУЩАЯ ДАТА ПОСЛЕ ИЛИ РАВНА ДАТЕ ХАЛВИНГА, ДОХОД УМЕНЬШАЕТСЯ В 2 РАЗА
                 if current_date >= halving_datetime:
                     revenue = revenue * 0.5
                 
-                # РАСХОДЫ
-                # Комиссия пула (процент от дохода)
                 pool_fee_amount = revenue * pool_fee
-                
-                # Электрика
                 electricity_cost = daily_cost_per_asic_rub * 30 * current_asics
-                
-                # Общие расходы
                 total_costs = pool_fee_amount + electricity_cost
                 
-                # ПРИБЫЛЬ ДО НАЛОГА
                 profit_before_tax = revenue - total_costs
                 
-                # НАЛОГ (только если прибыль положительная)
                 if profit_before_tax > 0:
                     tax = profit_before_tax * tax_rate
                     net_profit = profit_before_tax - tax
@@ -462,10 +460,8 @@ with tab1:
                     tax = 0
                     net_profit = profit_before_tax
                 
-                # Распределение чистой прибыли
                 to_reinvest = net_profit * (reinvest_percent / 100)
                 salary = net_profit - to_reinvest
-                
                 to_wallet = to_reinvest * (wallet_percent / 100)
                 to_asics = to_reinvest - to_wallet
                 
@@ -473,27 +469,22 @@ with tab1:
                 btc_amount = to_wallet / usd_rub / btc_usd
                 wallet_btc += btc_amount
                 
-                # Покупка новых ASIC
                 new_asics = int(savings // (asic_price * usd_rub))
                 if new_asics > 0:
                     current_asics += new_asics
                     savings -= new_asics * asic_price * usd_rub
-                    # Пересчитываем базовые значения с новым количеством ASIC
                     daily_revenue_per_asic_rub = (mining_data_per_asic["daily_revenue"] * usd_rub)
                     daily_cost_per_asic_rub = (daily_revenue_per_asic_usd - daily_profit_per_asic_usd) * usd_rub
                 
-                # Окупаемость по прибыли до налога
                 cumulative_profit_before_tax += profit_before_tax
                 investment_for_break_even = total_investment_usd if show_in_usd else total_investment
                 if cumulative_profit_before_tax >= investment_for_break_even and break_even_month is None:
                     break_even_month = month
                 
-                # Окупаемость по чистой прибыли
                 cumulative_net_profit += net_profit
                 if cumulative_net_profit >= investment_for_break_even and clean_break_even_month is None:
                     clean_break_even_month = month
                 
-                # Формирование результата
                 if show_in_usd:
                     revenue_usd = revenue / usd_rub
                     pool_fee_usd = pool_fee_amount / usd_rub
@@ -543,16 +534,11 @@ with tab1:
                         "Кошелек RUB": format_number(wallet_btc * btc_usd * usd_rub, 0, 'rub')
                     })
             
-            # Добавляем колонку "Продажа по прогнозу" только в последнюю строку
             if results:
-                # Рассчитываем значение продажи по прогнозу для последнего месяца
                 last_month_btc = wallet_btc
-                # Прогноз в USD: количество BTC * прогноз цены BTC
                 forecast_value_usd = last_month_btc * forecast_btc_price_usd
-                # Конвертируем в рубли по прогнозному курсу
                 forecast_value_rub = forecast_value_usd * forecast_usd_rub_rate
                 
-                # Добавляем это значение в последнюю строку results
                 if show_in_usd:
                     results[-1]["Продажа по прогнозу"] = format_number(forecast_value_usd, 0, 'usd')
                 else:
@@ -570,7 +556,6 @@ with tab1:
             
             initial_investment = asic_count * asic_price * (usd_rub if not show_in_usd else 1)
             
-            # Окупаемость по чистой прибыли
             cumulative_net = df['Чистая прибыль'].cumsum()
             clean_break_even_month = None
             for _, row in df.iterrows():
@@ -578,7 +563,6 @@ with tab1:
                     clean_break_even_month = row['Месяц']
                     break
             
-            # Окупаемость по прибыли до налога
             cumulative_profit = df['Прибыль'].cumsum()
             dirty_break_even_month = None
             for _, row in df.iterrows():
@@ -619,7 +603,6 @@ with tab1:
             summary_df = pd.DataFrame(summary_data)
             st.dataframe(summary_df.style.hide(axis="index"), hide_index=True, use_container_width=True)
             
-            # Определяем колонки для отображения
             display_columns = ["Месяц", "ASIC", "Доход", "Комиссия пула", "Электрика", "Расходы", 
                               "Прибыль", "Налог", "Чистая прибыль", "Зарплата", "Реинвест", 
                               "В кошелек", "Накопления", "Кошелек BTC"]
@@ -628,7 +611,6 @@ with tab1:
             else:
                 display_columns.append("Кошелек RUB")
             
-            # Добавляем колонку "Продажа по прогнозу" если она есть
             if "Продажа по прогнозу" in df.columns:
                 display_columns.append("Продажа по прогнозу")
             
