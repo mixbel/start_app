@@ -208,7 +208,14 @@ st.set_page_config(
     page_icon="⛏️",
     layout="wide"
 )
-
+# ========== ЗАГОЛОВОК С ЛОГОТИПОМ ==========
+col_logo, col_title = st.columns([1, 10])
+with col_logo:
+    st.image("89120564-6.png", width=50)
+with col_title:
+    st.markdown("<h1>Калькулятор от Gazminer</h1>", unsafe_allow_html=True)
+st.markdown("---")
+# ===========================================
 # ========== КАСТОМНЫЙ ДИЗАЙН ==========
 st.markdown("""
 <style>
