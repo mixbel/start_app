@@ -125,9 +125,6 @@ def get_usd_rub_rate():
 
 def get_mining_data_with_retry(hashrate_th, power_w, electricity_cost_usd, retries=3):
     """Получаем данные о майнинге с повторными попытками"""
-    # Очищаем кэш для mining_data при каждом новом расчете с другими параметрами
-    cache_key = f"mining_data_{hashrate_th}_{power_w}_{electricity_cost_usd}"
-    
     for attempt in range(retries):
         try:
             params = {
@@ -343,7 +340,6 @@ with tab1:
             
             halving_datetime = datetime.combine(halving_date, datetime.min.time())
             start_date = datetime.today()
-            halving_applied = False
             
             for month in range(1, total_months + 1):
                 active_scenario = None
@@ -367,10 +363,10 @@ with tab1:
                 difficulty_multiplier = (1 + difficulty_growth) ** (month - 1)
                 revenue = revenue / difficulty_multiplier if difficulty_multiplier > 0 else revenue
                 
-                # Халвинг
-                if current_date >= halving_datetime and not halving_applied:
+                # ХАЛВИНГ - ЕСЛИ ТЕКУЩАЯ ДАТА ПОСЛЕ ИЛИ РАВНА ДАТЕ ХАЛВИНГА, ДОХОД УМЕНЬШАЕТСЯ В 2 РАЗА
+                # Это работает для ВСЕХ месяцев после халвинга
+                if current_date >= halving_datetime:
                     revenue = revenue * 0.5
-                    halving_applied = True
                 
                 # РАСХОДЫ
                 # Комиссия пула (процент от дохода)
@@ -409,6 +405,9 @@ with tab1:
                 if new_asics > 0:
                     current_asics += new_asics
                     savings -= new_asics * asic_price * usd_rub
+                    # Пересчитываем базовые значения с новым количеством ASIC
+                    daily_revenue_per_asic_rub = (mining_data_per_asic["daily_revenue"] * usd_rub)
+                    daily_cost_per_asic_rub = (daily_revenue_per_asic_usd - daily_profit_per_asic_usd) * usd_rub
                 
                 # Окупаемость по прибыли до налога
                 cumulative_profit_before_tax += profit_before_tax
