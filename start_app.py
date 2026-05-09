@@ -41,9 +41,6 @@ if 'current_results' not in st.session_state:
 if 'scenarios' not in st.session_state:
     st.session_state.scenarios = []
 
-if 'trigger_calculation' not in st.session_state:
-    st.session_state.trigger_calculation = False
-
 # --- Функции для работы с API ---
 def get_cached_data(key):
     """Получаем данные из кэша если они актуальны"""
@@ -212,44 +209,43 @@ st.set_page_config(
     layout="wide"
 )
 
-# ========== ПЛАВАЮЩАЯ КНОПКА (CSS + HTML) ==========
+# ========== ПЛАВАЮЩАЯ КНОПКА (сверху справа) ==========
 st.markdown("""
 <style>
 .floating-calc-btn {
     position: fixed;
-    bottom: 30px;
-    right: 30px;
+    top: 70px;
+    right: 20px;
     z-index: 99999;
     background: linear-gradient(135deg, #f7931a, #ffb347);
     color: white;
     border: none;
-    padding: 14px 28px;
-    border-radius: 50px;
-    font-size: 18px;
+    padding: 12px 28px;
+    border-radius: 40px;
+    font-size: 16px;
     font-weight: bold;
     cursor: pointer;
-    box-shadow: 0 4px 20px rgba(247, 147, 26, 0.5);
+    box-shadow: 0 4px 15px rgba(247, 147, 26, 0.4);
     transition: all 0.3s ease;
-    text-align: center;
     font-family: inherit;
     animation: pulse 2s infinite;
 }
 .floating-calc-btn:hover {
     transform: scale(1.05);
-    box-shadow: 0 6px 25px rgba(247, 147, 26, 0.7);
+    box-shadow: 0 6px 20px rgba(247, 147, 26, 0.6);
     background: linear-gradient(135deg, #ffb347, #f7931a);
 }
 @keyframes pulse {
     0% { transform: scale(1); opacity: 1; }
-    50% { transform: scale(1.05); opacity: 0.95; }
+    50% { transform: scale(1.03); opacity: 0.95; }
     100% { transform: scale(1); opacity: 1; }
 }
 @media (max-width: 768px) {
     .floating-calc-btn {
-        padding: 10px 20px;
+        top: 60px;
+        right: 10px;
+        padding: 8px 20px;
         font-size: 14px;
-        bottom: 20px;
-        right: 20px;
     }
 }
 </style>
@@ -257,7 +253,7 @@ st.markdown("""
 <button class="floating-calc-btn" onclick="
     var btns = document.querySelectorAll('button');
     for(var i=0; i<btns.length; i++) {
-        if(btns[i].innerText.indexOf('Рассчитать') !== -1) {
+        if(btns[i].innerText.indexOf('Рассчитать') !== -1 && btns[i].getAttribute('kind') === 'primary') {
             btns[i].click();
             break;
         }
@@ -379,27 +375,45 @@ with tab1:
             add_scenario()
             st.rerun()
 
-    # ОСНОВНАЯ КНОПКА РАСЧЕТА (скрыта, но нужна для работы)
-    if st.button("🔄 Рассчитать", type="primary", key="calculate_btn", use_container_width=True):
-        st.session_state.trigger_calculation = True
+    # ОСНОВНАЯ КНОПКА РАСЧЕТА (с анимацией и стилями)
+    st.markdown("""
+    <style>
+    .stButton button {
+        background: linear-gradient(135deg, #f7931a, #ffb347) !important;
+        color: white !important;
+        border-radius: 40px !important;
+        padding: 12px 28px !important;
+        font-weight: bold !important;
+        font-size: 16px !important;
+        border: none !important;
+        transition: all 0.3s ease !important;
+    }
+    .stButton button:hover {
+        transform: scale(1.02) !important;
+        background: linear-gradient(135deg, #ffb347, #f7931a) !important;
+        box-shadow: 0 4px 15px rgba(247, 147, 26, 0.4) !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
     
-    # Логика расчета (вынесена отдельно)
-    if st.session_state.trigger_calculation:
-        st.session_state.trigger_calculation = False
+    if st.button("🔄 Рассчитать", type="primary", use_container_width=True, key="calculate_btn"):
         with st.spinner("Выполняю расчет..."):
             usd_rub = get_usd_rub_rate()
             btc_usd = get_btc_price()
             electricity_usd = electricity / usd_rub
             
+            # Преобразуем прогнозы в реальные значения
             forecast_btc_price_usd = forecast_btc_price * 1000
             forecast_usd_rub_rate = forecast_usd_rub
             
+            # Получаем данные с whattomine для 1 ASIC
             mining_data_per_asic = get_mining_data_with_retry(
                 asic_hashrate,
                 asic_power,
                 electricity_usd
             )
             
+            # Базовые значения для 1 ASIC
             daily_revenue_per_asic_usd = mining_data_per_asic["daily_revenue"]
             daily_profit_per_asic_usd = mining_data_per_asic["daily_profit"]
             daily_cost_per_asic_usd = daily_revenue_per_asic_usd - daily_profit_per_asic_usd
@@ -407,6 +421,7 @@ with tab1:
             daily_revenue_per_asic_rub = daily_revenue_per_asic_usd * usd_rub
             daily_cost_per_asic_rub = daily_cost_per_asic_usd * usd_rub
             
+            # Инициализация
             current_asics = asic_count
             savings = 0
             wallet_btc = 0
@@ -439,20 +454,26 @@ with tab1:
                 
                 current_date = start_date + pd.DateOffset(months=month)
                 
+                # ДОХОД (брутто)
                 revenue = daily_revenue_per_asic_rub * 30 * current_asics
                 
+                # Рост сложности
                 difficulty_multiplier = (1 + difficulty_growth) ** (month - 1)
                 revenue = revenue / difficulty_multiplier if difficulty_multiplier > 0 else revenue
                 
+                # Халвинг
                 if current_date >= halving_datetime:
                     revenue = revenue * 0.5
                 
+                # Расходы
                 pool_fee_amount = revenue * pool_fee
                 electricity_cost = daily_cost_per_asic_rub * 30 * current_asics
                 total_costs = pool_fee_amount + electricity_cost
                 
+                # Прибыль до налога
                 profit_before_tax = revenue - total_costs
                 
+                # Налог
                 if profit_before_tax > 0:
                     tax = profit_before_tax * tax_rate
                     net_profit = profit_before_tax - tax
@@ -460,6 +481,7 @@ with tab1:
                     tax = 0
                     net_profit = profit_before_tax
                 
+                # Распределение
                 to_reinvest = net_profit * (reinvest_percent / 100)
                 salary = net_profit - to_reinvest
                 to_wallet = to_reinvest * (wallet_percent / 100)
@@ -469,6 +491,7 @@ with tab1:
                 btc_amount = to_wallet / usd_rub / btc_usd
                 wallet_btc += btc_amount
                 
+                # Покупка ASIC
                 new_asics = int(savings // (asic_price * usd_rub))
                 if new_asics > 0:
                     current_asics += new_asics
@@ -476,6 +499,7 @@ with tab1:
                     daily_revenue_per_asic_rub = (mining_data_per_asic["daily_revenue"] * usd_rub)
                     daily_cost_per_asic_rub = (daily_revenue_per_asic_usd - daily_profit_per_asic_usd) * usd_rub
                 
+                # Окупаемость
                 cumulative_profit_before_tax += profit_before_tax
                 investment_for_break_even = total_investment_usd if show_in_usd else total_investment
                 if cumulative_profit_before_tax >= investment_for_break_even and break_even_month is None:
@@ -485,6 +509,7 @@ with tab1:
                 if cumulative_net_profit >= investment_for_break_even and clean_break_even_month is None:
                     clean_break_even_month = month
                 
+                # Формирование результата
                 if show_in_usd:
                     revenue_usd = revenue / usd_rub
                     pool_fee_usd = pool_fee_amount / usd_rub
@@ -534,6 +559,7 @@ with tab1:
                         "Кошелек RUB": format_number(wallet_btc * btc_usd * usd_rub, 0, 'rub')
                     })
             
+            # Добавляем колонку "Продажа по прогнозу"
             if results:
                 last_month_btc = wallet_btc
                 forecast_value_usd = last_month_btc * forecast_btc_price_usd
