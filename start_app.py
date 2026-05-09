@@ -204,14 +204,14 @@ def format_number(value, decimals=0, currency="rub"):
 
 # --- Интерфейс ---
 st.set_page_config(
-    page_title="Калькулятор майнинга PRO",
+    page_title="Калькулятор Gazminer",
     page_icon="⛏️",
     layout="wide"
 )
 # ========== ЗАГОЛОВОК С ЛОГОТИПОМ ==========
 col_logo, col_title = st.columns([1, 10])
 with col_logo:
-    st.image("89120564-6.png", width=50)
+    st.image("89120564-6.png", width=100)
 with col_title:
     st.markdown("<h1>Калькулятор от Gazminer</h1>", unsafe_allow_html=True)
 st.markdown("---")
