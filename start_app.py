@@ -208,57 +208,124 @@ st.set_page_config(
     page_icon="⛏️",
     layout="wide"
 )
-# ========== ПЛАВАЮЩАЯ КНОПКА ==========
+# ========== ПЛАВАЮЩАЯ КНОПКА (СВЕРХУ СПРАВА) ==========
 st.markdown("""
 <style>
-.floating-btn {
+/* Контейнер для фиксированной кнопки */
+.fixed-top-right {
     position: fixed;
-    bottom: 30px;
-    right: 30px;
+    top: 70px;
+    right: 20px;
     z-index: 999;
-    width: 60px;
-    height: 60px;
-    background: linear-gradient(135deg, #f7931a, #ffb347);
-    border-radius: 50%;
-    display: flex;
+}
+
+/* Стиль кнопки */
+.calc-btn {
+    display: inline-flex;
     align-items: center;
     justify-content: center;
+    gap: 8px;
+    background: linear-gradient(135deg, #f7931a, #ffb347);
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 30px;
+    font-size: 16px;
+    font-weight: bold;
     cursor: pointer;
     box-shadow: 0 4px 15px rgba(247, 147, 26, 0.4);
     transition: all 0.3s ease;
-    font-size: 28px;
-    font-weight: bold;
-    color: white;
-    border: none;
+    text-decoration: none;
+    font-family: inherit;
+    z-index: 1000;
 }
-.floating-btn:hover {
-    transform: scale(1.1);
+
+.calc-btn:hover {
+    transform: scale(1.05);
     box-shadow: 0 6px 20px rgba(247, 147, 26, 0.6);
+    background: linear-gradient(135deg, #ffb347, #f7931a);
 }
-@keyframes pulse {
-    0% { transform: scale(1); }
-    50% { transform: scale(1.05); }
-    100% { transform: scale(1); }
+
+/* Анимация пульсации */
+@keyframes pulse-ring {
+    0% { box-shadow: 0 0 0 0 rgba(247, 147, 26, 0.7); }
+    70% { box-shadow: 0 0 0 10px rgba(247, 147, 26, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(247, 147, 26, 0); }
 }
-.floating-btn {
-    animation: pulse 2s infinite;
+.calc-btn {
+    animation: pulse-ring 2s infinite;
 }
+
+/* Для мобильных устройств */
 @media (max-width: 768px) {
-    .floating-btn {
-        width: 50px;
-        height: 50px;
-        font-size: 24px;
-        bottom: 20px;
-        right: 20px;
+    .fixed-top-right {
+        top: 60px;
+        right: 10px;
+    }
+    .calc-btn {
+        padding: 8px 16px;
+        font-size: 14px;
     }
 }
 </style>
 
-<div class="floating-btn" onclick="document.querySelector('button[kind=primary]').click();">
-    🔄
+<div class="fixed-top-right">
+    <button class="calc-btn" id="floating-calc-btn">
+        🔄 РАСЧЕТ
+    </button>
 </div>
+
+<script>
+    // Ждем загрузки страницы и вешаем обработчик
+    document.addEventListener('DOMContentLoaded', function() {
+        const floatingBtn = document.getElementById('floating-calc-btn');
+        if (floatingBtn) {
+            floatingBtn.addEventListener('click', function() {
+                // Ищем кнопку "Рассчитать" с type="primary"
+                const buttons = document.querySelectorAll('button');
+                for (let btn of buttons) {
+                    if (btn.textContent.includes('Рассчитать') && btn.type !== 'submit') {
+                        btn.click();
+                        break;
+                    }
+                }
+            });
+        }
+    });
+    
+    // Также на случай если DOM уже загружен
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', function() {
+            const floatingBtn = document.getElementById('floating-calc-btn');
+            if (floatingBtn) {
+                floatingBtn.addEventListener('click', function() {
+                    const buttons = document.querySelectorAll('button');
+                    for (let btn of buttons) {
+                        if (btn.textContent.includes('Рассчитать') && btn.type !== 'submit') {
+                            btn.click();
+                            break;
+                        }
+                    }
+                });
+            }
+        });
+    } else {
+        const floatingBtn = document.getElementById('floating-calc-btn');
+        if (floatingBtn) {
+            floatingBtn.addEventListener('click', function() {
+                const buttons = document.querySelectorAll('button');
+                for (let btn of buttons) {
+                    if (btn.textContent.includes('Рассчитать') && btn.type !== 'submit') {
+                        btn.click();
+                        break;
+                    }
+                }
+            });
+        }
+    }
+</script>
 """, unsafe_allow_html=True)
-# =====================================
+# ===================================================
 tab1, tab2 = st.tabs(["Калькулятор", "Сохраненные результаты"])
 
 with tab1:
