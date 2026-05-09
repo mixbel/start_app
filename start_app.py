@@ -386,6 +386,22 @@ st.markdown("""
     }
 </style>
 """, unsafe_allow_html=True)
+    /* Принудительное переопределение всех таблиц */
+    .stDataFrame, .stDataFrame > div, .stDataFrame > div > div, 
+    .stDataFrame table, .stDataFrame thead, .stDataFrame tbody,
+    .dataframe, .dataframe table, .dataframe thead, .dataframe tbody {
+        background-color: #2a2a2a !important;
+    }
+    
+    .stDataFrame td, .dataframe td {
+        background-color: #2a2a2a !important !important;
+        color: white !important !important;
+    }
+    
+    .stDataFrame th, .dataframe th {
+        background-color: #ff5757 !important !important;
+        color: white !important !important;
+    }
 # ===================================================
 tab1, tab2 = st.tabs(["Калькулятор", "Сохраненные результаты"])
 
