@@ -28,7 +28,7 @@ API_CONFIG = {
 API_CACHE = {
     "btc_price": {"value": None, "timestamp": None, "expires": 300},
     "usd_rub": {"value": None, "timestamp": None, "expires": 3600},
-    "mining_data": {"value": None, "timestamp": None, "expires": 600}
+    "network_data": {"value": None, "timestamp": None, "expires": 3600}  # Кэш для сложности и награды
 }
 
 # Инициализация session_state
@@ -123,14 +123,76 @@ def get_usd_rub_rate():
     set_cached_data("usd_rub", rate)
     return rate
 
+def get_network_difficulty_and_reward():
+    """Получаем текущую сложность сети и награду за блок с blockchain.info"""
+    cached = get_cached_data("network_data")
+    if cached:
+        return cached
+    
+    try:
+        # Получаем сложность сети
+        difficulty_response = requests.get("https://blockchain.info/q/getdifficulty", timeout=10)
+        difficulty = float(difficulty_response.text)
+        
+        # Получаем текущую награду за блок (API сам учитывает халвинги)
+        reward_response = requests.get("https://blockchain.info/q/blockreward", timeout=10)
+        block_reward = float(reward_response.text)
+        
+        result = {
+            "difficulty": difficulty,
+            "block_reward": block_reward
+        }
+        
+        set_cached_data("network_data", result)
+        return result
+        
+    except Exception as e:
+        # Если API не работает, возвращаем примерные значения
+        # Текущая сложность ~100T, награда 6.25 BTC
+        return {
+            "difficulty": 100_000_000_000_000,
+            "block_reward": 6.25
+        }
+
 def get_mining_revenue_per_th_per_day():
-    """Получаем доходность 1 TH/s в сутки в USD (фиксированная величина)"""
-    # Базовая доходность на TH/s в сутки ~0.000045 BTC (примерно)
-    # В USD это зависит от курса BTC
-    btc_usd = get_btc_price()
-    # Стандартная доходность: 1 TH/s при текущей сложности дает около 0.000045 BTC в день
-    revenue_btc_per_th = 0.000045
-    return revenue_btc_per_th * btc_usd
+    """
+    Рассчитываем доходность 1 TH/s в сутки в USD
+    Использует реальные данные сложности и награды из API
+    """
+    try:
+        # Получаем актуальные данные
+        network_data = get_network_difficulty_and_reward()
+        difficulty = network_data["difficulty"]
+        block_reward = network_data["block_reward"]
+        btc_usd = get_btc_price()
+        
+        # Константы
+        seconds_per_day = 86400
+        seconds_per_block = 600  # 10 минут между блоками в среднем
+        
+        # Количество хэшей для нахождения одного блока при текущей сложности
+        # Формула: difficulty * 2^32 (где 2^32 = 4294967296)
+        hashes_per_block = difficulty * 4294967296
+        
+        # Хэшрейт 1 TH/s в хэшах в день
+        hash_rate_th_per_second = 1e12  # 1 TH/s = 1,000,000,000,000 хэш/с
+        hash_rate_th_per_day = hash_rate_th_per_second * seconds_per_day
+        
+        # Ожидаемое количество блоков, которое найдет 1 TH/s в день
+        blocks_found_per_day = hash_rate_th_per_day / hashes_per_block
+        
+        # Доход в BTC в день для 1 TH/s
+        btc_per_day = blocks_found_per_day * block_reward
+        
+        # Конвертируем в USD
+        return btc_per_day * btc_usd
+        
+    except Exception as e:
+        # Если расчет не удался, возвращаем реалистичное значение
+        # При сложности ~100T: около 0.00000035 BTC/TH/день
+        btc_usd = get_btc_price()
+        estimated_btc_per_th = 0.00000035
+        return estimated_btc_per_th * btc_usd
 
 # --- Функции для работы со сценариями ---
 def add_scenario():
@@ -192,7 +254,6 @@ tab1, tab2 = st.tabs(["Калькулятор", "Сохраненные резу
 with tab1:
     st.title("⛏️ Калькулятор майнинга Bitcoin")
     
-    # Изменяем разметку - теперь параметры слева, таблица справа
     col_params, col_results = st.columns([1, 2], gap="large")
     
     with col_params:
@@ -208,7 +269,6 @@ with tab1:
         pool_fee = st.number_input("Комиссия пула (%)", min_value=0.0, max_value=10.0, value=2.0, step=0.5, key="pool_fee") / 100
         tax_rate = st.number_input("Налог на прибыль (%)", min_value=0.0, max_value=50.0, value=13.0, step=1.0, key="tax_rate") / 100
         
-        # Халвинг с датой
         st.subheader("Халвинг Bitcoin")
         halving_date = st.date_input(
             "Дата следующего халвинга",
@@ -218,7 +278,6 @@ with tab1:
             key="halving_date"
         )
         
-        # Показываем, через сколько месяцев халвинг
         today = datetime.today().date()
         if halving_date > today:
             months_to_halving = (halving_date.year - today.year) * 12 + (halving_date.month - today.month)
@@ -234,19 +293,26 @@ with tab1:
         show_in_usd = st.checkbox("Показать расчеты в $", value=False, key="show_in_usd")
         
         if st.button("🔄 Обновить курсы"):
-            # Очищаем кэш
             for key in API_CACHE:
                 API_CACHE[key]["value"] = None
                 API_CACHE[key]["timestamp"] = None
-            st.success("Курсы обновлены!")
+            st.success("Курсы и данные сети обновлены!")
         
         usd_rub = get_usd_rub_rate()
         btc_usd = get_btc_price()
-        col1, col2 = st.columns(2)
+        network_data = get_network_difficulty_and_reward()
+        
+        col1, col2, col3 = st.columns(3)
         with col1:
             st.metric("Курс USD/RUB", f"{format_number(usd_rub, 2)} ₽")
         with col2:
             st.metric("Цена BTC", f"{format_number(btc_usd, 2)} $")
+        with col3:
+            st.metric("Награда за блок", f"{network_data['block_reward']} BTC")
+        
+        # Показываем примерную доходность
+        revenue_per_th = get_mining_revenue_per_th_per_day()
+        st.caption(f"💰 Текущая доходность: ~{format_number(revenue_per_th * asic_hashrate, 2, 'usd')}/день")
 
         # Блок сценариев
         st.header("Сценарии реинвестирования")
@@ -286,20 +352,19 @@ with tab1:
     # Кнопка расчета
     if st.button("🔄 Рассчитать", type="primary", use_container_width=True, key="calculate_btn"):
         with st.spinner("Выполняю расчет..."):
-            # Получаем данные
             usd_rub = get_usd_rub_rate()
             btc_usd = get_btc_price()
             
-            # Доходность 1 TH/s в день в USD
+            # Получаем базовую доходность 1 TH/s в день
             revenue_per_th_per_day_usd = get_mining_revenue_per_th_per_day()
             
-            # Общий хешрейт в TH/s
+            # Общий хешрейт
             total_hashrate_th = asic_hashrate * asic_count
             
-            # Базовый дневной доход в USD (без учета сложности и халвинга)
+            # Базовый дневной доход в USD
             base_daily_revenue_usd = revenue_per_th_per_day_usd * total_hashrate_th
             
-            # Расходы на электричество
+            # Дневные расходы на электричество
             daily_power_cost_rub = (asic_power / 1000) * 24 * electricity * asic_count
             daily_power_cost_usd = daily_power_cost_rub / usd_rub
             
@@ -310,7 +375,6 @@ with tab1:
             wallet_btc = 0
             results = []
             
-            # Для расчета окупаемости
             total_investment = asic_count * asic_price * usd_rub
             total_investment_usd = asic_count * asic_price
             cumulative_profit = 0
@@ -318,15 +382,12 @@ with tab1:
             break_even_month = None
             clean_break_even_month = None
             
-            # Определяем общее количество месяцев из сценариев
             total_months = max(s["end"] for s in st.session_state.scenarios) if st.session_state.scenarios else 36
             
-            # Преобразуем дату халвинга для сравнения
             halving_datetime = datetime.combine(halving_date, datetime.min.time())
             start_date = datetime.today()
             
             for month in range(1, total_months + 1):
-                # Находим активный сценарий для текущего месяца
                 active_scenario = None
                 for scenario in st.session_state.scenarios:
                     if scenario["start"] <= month <= scenario["end"]:
@@ -336,52 +397,42 @@ with tab1:
                 if not active_scenario:
                     continue
                 
-                # Используем параметры из активного сценария
                 reinvest_percent = active_scenario["reinvest"]
                 wallet_percent = active_scenario["wallet"]
                 
-                # Расчет текущей даты
                 current_date = start_date + pd.DateOffset(months=month)
                 
-                # 1. Расчет ДОХОДА (брутто) - зависит только от хешрейта и курсов
+                # ДОХОД
                 monthly_revenue = base_daily_revenue_usd * 30
                 
-                # Применяем рост сложности (накопительно)
+                # Рост сложности
                 difficulty_multiplier = (1 + difficulty_growth) ** (month - 1)
                 monthly_revenue = monthly_revenue / difficulty_multiplier if difficulty_multiplier > 0 else monthly_revenue
                 
-                # Применяем халвинг (постоянное снижение после даты)
-                halving_count = 0
+                # Халвинг
                 if current_date >= halving_datetime:
-                    # Рассчитываем сколько халвингов прошло (каждые ~4 года)
-                    years_after_halving = (current_date.year - halving_datetime.year)
-                    halving_count = years_after_halving // 4
-                    if halving_count > 0:
-                        monthly_revenue = monthly_revenue * (0.5 ** halving_count)
-                    else:
-                        monthly_revenue = monthly_revenue * 0.5
+                    monthly_revenue = monthly_revenue * 0.5
                 
-                # Конвертируем доход в рубли если нужно
+                # Пересчет в рубли
                 monthly_revenue_rub = monthly_revenue * usd_rub
                 
-                # 2. Расходы
-                # Комиссия пула (процент от дохода)
+                # КОМИССИЯ ПУЛА
                 pool_fee_amount = monthly_revenue * pool_fee
                 pool_fee_amount_rub = pool_fee_amount * usd_rub
                 
-                # Электрика
+                # ЭЛЕКТРИКА
                 electricity_cost = daily_power_cost_usd * 30
                 electricity_cost_rub = electricity_cost * usd_rub
                 
-                # Общие расходы
+                # ОБЩИЕ РАСХОДЫ
                 total_costs = pool_fee_amount + electricity_cost
                 total_costs_rub = total_costs * usd_rub
                 
-                # 3. Прибыль до налога
+                # ПРИБЫЛЬ ДО НАЛОГА
                 profit_before_tax = monthly_revenue - total_costs
                 profit_before_tax_rub = profit_before_tax * usd_rub
                 
-                # 4. Налог (только если прибыль положительная)
+                # НАЛОГ
                 if profit_before_tax > 0:
                     tax = profit_before_tax * tax_rate
                     tax_rub = tax * usd_rub
@@ -396,39 +447,34 @@ with tab1:
                 # Распределение чистой прибыли
                 to_reinvest = net_profit * (reinvest_percent / 100)
                 salary = net_profit - to_reinvest
-                
                 to_wallet = to_reinvest * (wallet_percent / 100)
                 to_asics = to_reinvest - to_wallet
                 
                 savings += to_asics
-                
-                # Пополнение кошелька в BTC
                 btc_amount = to_wallet / btc_usd
                 wallet_btc += btc_amount
                 
-                # Покупка ASIC
+                # Покупка новых ASIC
                 if savings >= asic_price:
                     new_asics = int(savings // asic_price)
                     current_asics += new_asics
                     current_hashrate_th = asic_hashrate * current_asics
                     savings -= new_asics * asic_price
-                    # Пересчитываем базовый доход с новым хешрейтом
                     base_daily_revenue_usd = revenue_per_th_per_day_usd * current_hashrate_th
+                    daily_power_cost_usd = (asic_power / 1000) * 24 * electricity * current_asics / usd_rub
+                    daily_power_cost_rub = (asic_power / 1000) * 24 * electricity * current_asics
                 
-                # Расчет окупаемости грязная (по прибыли до налога)
+                # Окупаемость
                 cumulative_profit += profit_before_tax
                 investment_for_break_even = total_investment_usd if show_in_usd else total_investment
                 if cumulative_profit >= investment_for_break_even and break_even_month is None:
                     break_even_month = month
                 
-                # Расчет чистой окупаемости (зарплата + кошелек в той же валюте)
-                current_salary_wallet = (salary + to_wallet)
                 cumulative_net_profit += net_profit
-                
                 if cumulative_net_profit >= investment_for_break_even and clean_break_even_month is None:
                     clean_break_even_month = month
                 
-                # Формируем результат в зависимости от выбранной валюты
+                # Формирование результата
                 if show_in_usd:
                     results.append({
                         "Месяц": month,
@@ -466,25 +512,20 @@ with tab1:
                         "Кошелек RUB": format_number(wallet_btc * btc_usd * usd_rub, 0, 'rub')
                     })
             
-            # Создаем DataFrame с результатами
             df = pd.DataFrame(results)
             st.session_state.current_results = df
             st.rerun()
 
-    # Отображение результатов в правой колонке
+    # Отображение результатов
     with col_results:
         if st.session_state.current_results is not None:
-            # Вычисляем сводные данные
             df = st.session_state.current_results.copy()
-            
-            # Получаем текущие параметры для расчетов
             usd_rub = get_usd_rub_rate()
             btc_usd = get_btc_price()
             
-            # Первоначальные инвестиции
             initial_investment = asic_count * asic_price * (usd_rub if not show_in_usd else 1)
             
-            # Окупаемость по чистой прибыли
+            # Окупаемость
             cumulative_net = df['Чистая прибыль'].cumsum()
             clean_break_even_month = None
             for _, row in df.iterrows():
@@ -492,7 +533,6 @@ with tab1:
                     clean_break_even_month = row['Месяц']
                     break
             
-            # Окупаемость по прибыли до налога
             cumulative_profit = df['Прибыль'].cumsum()
             dirty_break_even_month = None
             for _, row in df.iterrows():
@@ -500,18 +540,7 @@ with tab1:
                     dirty_break_even_month = row['Месяц']
                     break
             
-            # Общие показатели
-            total_revenue = df['Доход'].sum()
-            total_pool_fee = df['Комиссия пула'].sum()
-            total_electricity = df['Электрика'].sum()
-            total_costs = df['Расходы'].sum()
-            total_profit_before_tax = df['Прибыль'].sum()
-            total_tax = df['Налог'].sum()
-            total_net_profit = df['Чистая прибыль'].sum()
-            final_btc = float(df.iloc[-1]['Кошелек BTC'].split()[0]) if 'Кошелек BTC' in df.columns else 0
-            final_asics = df.iloc[-1]['ASIC']
-            
-            # Создаем таблицу со сводными данными
+            # Сводные данные
             summary_data = {
                 "Показатель": [
                     "Первоначальные инвестиции", 
@@ -531,28 +560,20 @@ with tab1:
                     format_number(initial_investment, 0, "usd" if show_in_usd else "rub"),
                     str(clean_break_even_month) if clean_break_even_month else "Не окупилось",
                     str(dirty_break_even_month) if dirty_break_even_month else "Не окупилось",
-                    format_number(total_revenue, 0, "usd" if show_in_usd else "rub"),
-                    format_number(total_pool_fee, 0, "usd" if show_in_usd else "rub"),
-                    format_number(total_electricity, 0, "usd" if show_in_usd else "rub"),
-                    format_number(total_costs, 0, "usd" if show_in_usd else "rub"),
-                    format_number(total_profit_before_tax, 0, "usd" if show_in_usd else "rub"),
-                    format_number(total_tax, 0, "usd" if show_in_usd else "rub"),
-                    format_number(total_net_profit, 0, "usd" if show_in_usd else "rub"),
-                    f"{final_asics} шт.",
-                    f"{final_btc:.8f} BTC"
+                    format_number(df['Доход'].sum(), 0, "usd" if show_in_usd else "rub"),
+                    format_number(df['Комиссия пула'].sum(), 0, "usd" if show_in_usd else "rub"),
+                    format_number(df['Электрика'].sum(), 0, "usd" if show_in_usd else "rub"),
+                    format_number(df['Расходы'].sum(), 0, "usd" if show_in_usd else "rub"),
+                    format_number(df['Прибыль'].sum(), 0, "usd" if show_in_usd else "rub"),
+                    format_number(df['Налог'].sum(), 0, "usd" if show_in_usd else "rub"),
+                    format_number(df['Чистая прибыль'].sum(), 0, "usd" if show_in_usd else "rub"),
+                    f"{df.iloc[-1]['ASIC']} шт.",
+                    df.iloc[-1]['Кошелек BTC']
                 ]
             }
             summary_df = pd.DataFrame(summary_data)
-            st.session_state.current_summary = summary_df.to_dict('records')
+            st.dataframe(summary_df.style.hide(axis="index"), hide_index=True, use_container_width=True)
             
-            # Отображаем сводные данные
-            st.dataframe(
-                summary_df.style.hide(axis="index"),
-                hide_index=True,
-                use_container_width=True
-            )
-            
-            # Выбираем колонки для отображения в правильном порядке
             display_columns = ["Месяц", "ASIC", "Доход", "Комиссия пула", "Электрика", "Расходы", 
                               "Прибыль", "Налог", "Чистая прибыль", "Зарплата", "Реинвест", 
                               "В кошелек", "Накопления", "Кошелек BTC"]
@@ -561,52 +582,42 @@ with tab1:
             else:
                 display_columns.append("Кошелек RUB")
             
-            # Форматируем и отображаем таблицу
             formatted_df = df[display_columns].copy()
             for col in ["Доход", "Комиссия пула", "Электрика", "Расходы", "Прибыль", 
                        "Налог", "Чистая прибыль", "Зарплата", "Реинвест", "В кошелек", "Накопления"]:
                 if col in formatted_df.columns:
                     formatted_df[col] = formatted_df[col].apply(lambda x: format_number(x, 0, "usd" if show_in_usd else "rub"))
             
-            st.dataframe(
-                formatted_df,
-                hide_index=True,
-                use_container_width=True,
-                height=700
-            )
-
-            # Форма для сохранения
+            st.dataframe(formatted_df, hide_index=True, use_container_width=True, height=700)
+            
+            # Форма сохранения
             with st.form("save_form"):
                 result_name = st.text_input("Название сохранения", 
                                           value=f"Результат {datetime.now().strftime('%Y-%m-%d %H:%M')}")
-                
                 if st.form_submit_button("💾 Сохранить результаты"):
                     if result_name.strip():
                         if result_name in st.session_state.saved_results:
                             st.error("Результат с таким названием уже существует!")
                         else:
-                            # Сохраняем текущие параметры
-                            current_params = {
-                                "asic_count": asic_count,
-                                "asic_hashrate": asic_hashrate,
-                                "asic_power": asic_power,
-                                "asic_price": asic_price,
-                                "electricity": electricity,
-                                "difficulty_growth": difficulty_growth,
-                                "pool_fee": pool_fee,
-                                "tax_rate": tax_rate,
-                                "halving_date": halving_date.isoformat(),
-                                "show_in_usd": show_in_usd,
-                                "usd_rub_rate": usd_rub,
-                                "btc_price_usd": btc_usd,
-                                "scenarios": st.session_state.scenarios.copy()
-                            }
-                            
                             st.session_state.saved_results[result_name] = {
                                 "timestamp": datetime.now().isoformat(),
                                 "data": st.session_state.current_results.to_dict('records'),
-                                "summary": st.session_state.current_summary,
-                                "params": current_params
+                                "summary": summary_data,
+                                "params": {
+                                    "asic_count": asic_count,
+                                    "asic_hashrate": asic_hashrate,
+                                    "asic_power": asic_power,
+                                    "asic_price": asic_price,
+                                    "electricity": electricity,
+                                    "difficulty_growth": difficulty_growth,
+                                    "pool_fee": pool_fee,
+                                    "tax_rate": tax_rate,
+                                    "halving_date": halving_date.isoformat(),
+                                    "show_in_usd": show_in_usd,
+                                    "usd_rub_rate": usd_rub,
+                                    "btc_price_usd": btc_usd,
+                                    "scenarios": st.session_state.scenarios.copy()
+                                }
                             }
                             st.success(f"Результаты сохранены под названием: {result_name}")
                             st.rerun()
@@ -615,50 +626,20 @@ with tab1:
 
 with tab2:
     st.title("📁 Сохраненные результаты")
-    
-    # Проверяем наличие сохраненных результатов в session_state
     if not st.session_state.get('saved_results', {}):
         st.info("Нет сохраненных результатов")
     else:
-        # Создаем копию словаря, чтобы избежать изменений во время итерации
         saved_results_copy = st.session_state.saved_results.copy()
-        
         for name, data in saved_results_copy.items():
             with st.expander(f"📌 {name} ({data['timestamp']})"):
                 st.write("Параметры расчета:")
-                # Показываем параметры в удобном формате
-                params = data["params"]
-                param_display = {
-                    "Количество ASIC": params.get("asic_count"),
-                    "Хешрейт 1 ASIC (TH/s)": params.get("asic_hashrate"),
-                    "Потребление (Вт)": params.get("asic_power"),
-                    "Цена ASIC ($)": params.get("asic_price"),
-                    "Электричество (руб/кВт·ч)": params.get("electricity"),
-                    "Рост сложности (%/мес)": params.get("difficulty_growth", 0) * 100,
-                    "Комиссия пула (%)": params.get("pool_fee", 0) * 100,
-                    "Налог (%)": params.get("tax_rate", 0) * 100,
-                    "Дата халвинга": params.get("halving_date", "Не указана"),
-                    "Валюта": "USD" if params.get("show_in_usd") else "RUB"
-                }
-                st.json(param_display)
-                
-                # Отображаем сводные данные
+                st.json(data["params"])
                 if "summary" in data:
                     st.write("Сводные данные:")
                     summary_df = pd.DataFrame(data["summary"])
-                    st.dataframe(
-                        summary_df.style.hide(axis="index"),
-                        hide_index=True,
-                        use_container_width=True
-                    )
-                
-                # Восстанавливаем DataFrame
+                    st.dataframe(summary_df.style.hide(axis="index"), hide_index=True, use_container_width=True)
                 df = pd.DataFrame(data["data"])
-                
-                # Определяем валюту для форматирования
                 show_in_usd_saved = data["params"].get("show_in_usd", False)
-                
-                # Форматируем для отображения
                 display_columns = ["Месяц", "ASIC", "Доход", "Комиссия пула", "Электрика", "Расходы", 
                                   "Прибыль", "Налог", "Чистая прибыль", "Зарплата", "Реинвест", 
                                   "В кошелек", "Накопления", "Кошелек BTC"]
@@ -666,19 +647,12 @@ with tab2:
                     display_columns.append("Кошелек USD")
                 elif not show_in_usd_saved and "Кошелек RUB" in df.columns:
                     display_columns.append("Кошелек RUB")
-                
                 formatted_df = df[display_columns].copy()
                 for col in ["Доход", "Комиссия пула", "Электрика", "Расходы", "Прибыль", 
                            "Налог", "Чистая прибыль", "Зарплата", "Реинвест", "В кошелек", "Накопления"]:
                     if col in formatted_df.columns:
                         formatted_df[col] = formatted_df[col].apply(lambda x: format_number(x, 0, "usd" if show_in_usd_saved else "rub"))
-                
-                st.dataframe(
-                    formatted_df,
-                    hide_index=True,
-                    use_container_width=True
-                )
-                
+                st.dataframe(formatted_df, hide_index=True, use_container_width=True)
                 if st.button(f"❌ Удалить {name}", key=f"delete_{name}"):
                     del st.session_state.saved_results[name]
                     st.rerun()
