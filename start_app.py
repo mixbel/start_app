@@ -208,7 +208,57 @@ st.set_page_config(
     page_icon="⛏️",
     layout="wide"
 )
+# ========== ПЛАВАЮЩАЯ КНОПКА ==========
+st.markdown("""
+<style>
+.floating-btn {
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    z-index: 999;
+    width: 60px;
+    height: 60px;
+    background: linear-gradient(135deg, #f7931a, #ffb347);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 4px 15px rgba(247, 147, 26, 0.4);
+    transition: all 0.3s ease;
+    font-size: 28px;
+    font-weight: bold;
+    color: white;
+    border: none;
+}
+.floating-btn:hover {
+    transform: scale(1.1);
+    box-shadow: 0 6px 20px rgba(247, 147, 26, 0.6);
+}
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+}
+.floating-btn {
+    animation: pulse 2s infinite;
+}
+@media (max-width: 768px) {
+    .floating-btn {
+        width: 50px;
+        height: 50px;
+        font-size: 24px;
+        bottom: 20px;
+        right: 20px;
+    }
+}
+</style>
 
+<div class="floating-btn" onclick="document.querySelector('button[kind=primary]').click();">
+    🔄
+</div>
+""", unsafe_allow_html=True)
+# =====================================
 tab1, tab2 = st.tabs(["Калькулятор", "Сохраненные результаты"])
 
 with tab1:
