@@ -286,27 +286,43 @@ st.markdown("""
     }
     
     /* ТАБЛИЦЫ - темный фон, белый текст */
-    .stDataFrame {
+    div[data-testid="stDataFrame"] {
         background-color: #2a2a2a !important;
         border-radius: 12px !important;
-        overflow: hidden !important;
+    }
+    .stDataFrame {
+        background-color: #2a2a2a !important;
     }
     .dataframe {
         background-color: #2a2a2a !important;
     }
-    .dataframe th {
+    .dataframe thead tr th {
         background-color: #ff5757 !important;
         color: white !important;
         font-weight: bold !important;
         text-align: center !important;
+        border: none !important;
     }
-    .dataframe td {
+    .dataframe tbody tr td {
         color: white !important;
         background-color: #2a2a2a !important;
-        border-bottom: 1px solid #3a3a3a !important;
+        border-bottom: 1px solid #3d3d3d !important;
     }
-    .dataframe tr:hover td {
-        background-color: #3a3a3a !important;
+    .dataframe tbody tr:hover td {
+        background-color: #3d3d3d !important;
+    }
+    
+    /* Таблица сводных данных */
+    .stTable {
+        background-color: #2a2a2a !important;
+    }
+    .stTable thead tr th {
+        background-color: #ff5757 !important;
+        color: white !important;
+    }
+    .stTable tbody tr td {
+        background-color: #2a2a2a !important;
+        color: white !important;
     }
     
     /* Контейнеры с рамкой - бирюзовая */
@@ -349,16 +365,27 @@ st.markdown("""
         border-top-color: #ff5757 !important;
     }
     
-    /* Селекторы (выпадающие списки) */
+    /* Выпадающие списки */
     .stSelectbox div[data-baseweb="select"] > div {
         background-color: #2a2a2a !important;
         border-color: #2cb1c3 !important;
+        color: white !important;
     }
     
     /* Дата пикер */
     .stDateInput input {
         background-color: #2a2a2a !important;
         color: white !important;
+    }
+    
+    /* Текст внутри полей ввода */
+    input, textarea, select {
+        color: white !important;
+    }
+    
+    /* Placeholder текст */
+    ::placeholder {
+        color: #888888 !important;
     }
 </style>
 """, unsafe_allow_html=True)
