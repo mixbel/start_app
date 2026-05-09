@@ -211,7 +211,7 @@ st.set_page_config(
 # ========== ЗАГОЛОВОК С ЛОГОТИПОМ ==========
 col_logo, col_title = st.columns([1, 10])
 with col_logo:
-    st.image("89120564-6.png", width=100)
+    st.image("89120564-6.png", width=200)
 with col_title:
     st.markdown("<h1>Калькулятор от Gazminer</h1>", unsafe_allow_html=True)
 st.markdown("---")
@@ -221,12 +221,7 @@ st.markdown("""
 <style>
     /* Основной фон страницы */
     .stApp {
-        background-color: #1a1a1a;
-    }
-    
-    /* Фон боковой панели */
-    .css-1d391kg {
-        background-color: #222222;
+        background-color: #1a1a1a !important;
     }
     
     /* Все тексты белые */
@@ -255,17 +250,17 @@ st.markdown("""
         box-shadow: 0 2px 10px rgba(255, 87, 87, 0.3) !important;
     }
     
-    /* Рамки полей ввода */
+    /* Рамки полей ввода - БИРЮЗОВЫЕ */
     .stNumberInput input, .stTextInput input, .stDateInput input, .stSelectbox select {
-        border-color: #2cb1c3 !important;
-        border-width: 2px !important;
+        border: 2px solid #2cb1c3 !important;
         border-radius: 8px !important;
         background-color: #2a2a2a !important;
         color: white !important;
     }
     .stNumberInput input:focus, .stTextInput input:focus, .stDateInput input:focus {
         border-color: #ff5757 !important;
-        box-shadow: 0 0 5px rgba(44, 177, 195, 0.3) !important;
+        outline: none !important;
+        box-shadow: 0 0 8px rgba(44, 177, 195, 0.5) !important;
     }
     
     /* Слайдеры */
@@ -290,7 +285,7 @@ st.markdown("""
         color: #ff5757 !important;
     }
     
-    /* Таблицы */
+    /* ТАБЛИЦЫ - темный фон, белый текст */
     .stDataFrame {
         background-color: #2a2a2a !important;
         border-radius: 12px !important;
@@ -303,13 +298,18 @@ st.markdown("""
         background-color: #ff5757 !important;
         color: white !important;
         font-weight: bold !important;
+        text-align: center !important;
     }
     .dataframe td {
         color: white !important;
         background-color: #2a2a2a !important;
+        border-bottom: 1px solid #3a3a3a !important;
+    }
+    .dataframe tr:hover td {
+        background-color: #3a3a3a !important;
     }
     
-    /* Контейнеры с рамкой */
+    /* Контейнеры с рамкой - бирюзовая */
     .stContainer {
         background-color: #2a2a2a !important;
         border-radius: 12px !important;
@@ -344,31 +344,24 @@ st.markdown("""
         color: white !important;
     }
     
-    /* Заголовок с логотипом */
-    .title-container {
-        display: flex;
-        align-items: center;
-        gap: 15px;
-        margin-bottom: 20px;
+    /* Спиннер (загрузка) */
+    .stSpinner > div {
+        border-top-color: #ff5757 !important;
     }
-    .title-logo {
-        width: 50px;
-        height: 50px;
+    
+    /* Селекторы (выпадающие списки) */
+    .stSelectbox div[data-baseweb="select"] > div {
+        background-color: #2a2a2a !important;
+        border-color: #2cb1c3 !important;
+    }
+    
+    /* Дата пикер */
+    .stDateInput input {
+        background-color: #2a2a2a !important;
+        color: white !important;
     }
 </style>
 """, unsafe_allow_html=True)
-
-# Заголовок с логотипом
-col_logo, col_title = st.columns([1, 10])
-with col_logo:
-    # Для логотипа нужно загрузить картинку:
-    # Вариант 1 - из интернета:
-    st.image("https://cdn-icons-png.flaticon.com/512/5554/5554175.png", width=50)
-    # Вариант 2 - локальный файл (раскомментируй и положи logo.png в папку с проектом):
-    # st.image("logo.png", width=50)
-with col_title:
-    st.markdown("# Калькулятор от Gazminer")
-
 # ===================================================
 
 tab1, tab2 = st.tabs(["Калькулятор", "Сохраненные результаты"])
