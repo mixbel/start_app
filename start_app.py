@@ -215,7 +215,7 @@ with col2:
     with col_logo:
         st.image("89120564-6.png", width=60)
     with col_text:
-        st.markdown("<h1 style='margin: 0; text-align: center;'>Калькулятор от Gazminer</h1>", unsafe_allow_html=True)
+        st.markdown("<h1 style='text-align: center; margin-top: -90px;'>Калькулятор от Gazminer</h1>", unsafe_allow_html=True)
     with col_empty:
         st.write("")
 st.markdown("---")
