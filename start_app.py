@@ -229,9 +229,12 @@ st.markdown("""
         color: white !important;
     }
     
-    /* Заголовки */
-    h1, h2, h3, .stHeader {
+    /* Заголовки - h1 белый, остальные бирюзовые */
+    h1 {
         color: white !important;
+    }
+    h2, h3, .stHeader {
+        color: #2cb1c3 !important;
     }
     
     /* Кнопки - красные */
@@ -257,6 +260,11 @@ st.markdown("""
         background-color: #2a2a2a !important;
         color: white !important;
     }
+    .stNumberInput input:focus, .stTextInput input:focus, .stDateInput input:focus {
+        border-color: #ff5757 !important;
+        outline: none !important;
+        box-shadow: 0 0 8px rgba(44, 177, 195, 0.5) !important;
+    }
     
     /* Слайдеры */
     .stSlider .stSlider-track {
@@ -280,99 +288,13 @@ st.markdown("""
         color: #ff5757 !important;
     }
     
-    /* ===== МАКСИМАЛЬНО АГРЕССИВНЫЕ СТИЛИ ДЛЯ ТАБЛИЦ ===== */
-    /* Все возможные классы таблиц */
-    .stDataFrame,
-    .stDataFrame > div,
-    .stDataFrame > div > div,
-    .stDataFrame table,
-    .stDataFrame thead,
-    .stDataFrame tbody,
-    .stDataFrame tr,
-    .stDataFrame th,
-    .stDataFrame td,
-    .dataframe,
-    .dataframe table,
-    .dataframe thead,
-    .dataframe tbody,
-    .dataframe tr,
-    .dataframe th,
-    .dataframe td,
-    div[data-testid="stDataFrame"],
-    div[data-testid="stDataFrame"] table,
-    div[data-testid="stDataFrame"] thead,
-    div[data-testid="stDataFrame"] tbody,
-    div[data-testid="stDataFrame"] tr,
-    div[data-testid="stDataFrame"] th,
-    div[data-testid="stDataFrame"] td,
-    [data-testid="stDataFrame"],
-    [data-testid="stDataFrame"] table,
-    .element-container div[data-testid="stDataFrame"] {
+    /* Информационные сообщения */
+    .stAlert {
         background-color: #2a2a2a !important;
-    }
-    
-    /* Заголовки таблиц */
-    .stDataFrame th,
-    .dataframe th,
-    div[data-testid="stDataFrame"] th,
-    .stDataFrame thead tr th,
-    .dataframe thead tr th,
-    div[data-testid="stDataFrame"] thead tr th {
-        background-color: #ff5757 !important;
-        color: white !important;
-        font-weight: bold !important;
-        text-align: center !important;
-    }
-    
-    /* Ячейки таблиц */
-    .stDataFrame td,
-    .dataframe td,
-    div[data-testid="stDataFrame"] td,
-    .stDataFrame tbody tr td,
-    .dataframe tbody tr td,
-    div[data-testid="stDataFrame"] tbody tr td {
-        background-color: #2a2a2a !important;
-        color: white !important;
-        border-bottom: 1px solid #3d3d3d !important;
-    }
-    
-    /* Четные строки */
-    .stDataFrame tr:nth-child(even) td,
-    .dataframe tr:nth-child(even) td,
-    div[data-testid="stDataFrame"] tr:nth-child(even) td,
-    .stDataFrame tbody tr:nth-child(even) td,
-    .dataframe tbody tr:nth-child(even) td {
-        background-color: #222222 !important;
-    }
-    
-    /* Нечетные строки */
-    .stDataFrame tr:nth-child(odd) td,
-    .dataframe tr:nth-child(odd) td,
-    div[data-testid="stDataFrame"] tr:nth-child(odd) td,
-    .stDataFrame tbody tr:nth-child(odd) td,
-    .dataframe tbody tr:nth-child(odd) td {
-        background-color: #2a2a2a !important;
-    }
-    
-    /* Строка при наведении */
-    .stDataFrame tr:hover td,
-    .dataframe tr:hover td,
-    div[data-testid="stDataFrame"] tr:hover td,
-    .stDataFrame tbody tr:hover td,
-    .dataframe tbody tr:hover td {
-        background-color: #3d3d3d !important;
-    }
-    
-    /* Сводная таблица */
-    .stTable {
-        background-color: #2a2a2a !important;
-    }
-    .stTable thead tr th {
-        background-color: #ff5757 !important;
+        border-left-color: #ff5757 !important;
         color: white !important;
     }
-    .stTable tbody tr td {
-        background-color: #2a2a2a !important;
+    .stAlert p {
         color: white !important;
     }
     
@@ -399,13 +321,6 @@ st.markdown("""
         color: white !important;
     }
     
-    /* Информационные сообщения */
-    .stAlert {
-        background-color: #2a2a2a !important;
-        border-left-color: #ff5757 !important;
-        color: white !important;
-    }
-    
     /* Чекбокс */
     .stCheckbox label span {
         color: white !important;
@@ -414,6 +329,19 @@ st.markdown("""
     /* Спиннер */
     .stSpinner > div {
         border-top-color: #ff5757 !important;
+    }
+    
+    /* Таблицы */
+    div[data-testid="stDataFrame"] {
+        background-color: #2a2a2a !important;
+    }
+    div[data-testid="stDataFrame"] tbody tr td {
+        background-color: #2a2a2a !important;
+        color: white !important;
+    }
+    div[data-testid="stDataFrame"] thead tr th {
+        background-color: #ff5757 !important;
+        color: white !important;
     }
 </style>
 """, unsafe_allow_html=True)
