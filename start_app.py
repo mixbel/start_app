@@ -285,62 +285,38 @@ st.markdown("""
         color: #ff5757 !important;
     }
     
-    /* ===== ТАБЛИЦЫ РЕЗУЛЬТАТОВ ===== */
-    /* Контейнер таблицы */
+    /* ТАБЛИЦЫ - принудительное переопределение */
     div[data-testid="stDataFrame"] {
         background-color: #2a2a2a !important;
-        border-radius: 12px !important;
     }
-    
-    /* Сама таблица */
     div[data-testid="stDataFrame"] table {
         background-color: #2a2a2a !important;
-        border-collapse: collapse !important;
     }
-    
-    /* Заголовки таблицы */
     div[data-testid="stDataFrame"] thead tr th {
         background-color: #ff5757 !important;
         color: white !important;
-        font-weight: bold !important;
-        text-align: center !important;
-        border: none !important;
-        padding: 10px 8px !important;
     }
-    
-    /* Ячейки таблицы */
     div[data-testid="stDataFrame"] tbody tr td {
         background-color: #2a2a2a !important;
         color: white !important;
-        text-align: center !important;
-        padding: 8px !important;
         border-bottom: 1px solid #3d3d3d !important;
     }
-    
-    /* Четные строки */
     div[data-testid="stDataFrame"] tbody tr:nth-child(even) td {
         background-color: #222222 !important;
     }
-    
-    /* Нечетные строки */
-    div[data-testid="stDataFrame"] tbody tr:nth-child(odd) td {
-        background-color: #2a2a2a !important;
-    }
-    
-    /* Строка при наведении */
     div[data-testid="stDataFrame"] tbody tr:hover td {
         background-color: #3d3d3d !important;
     }
     
     /* Сводная таблица */
-    div[data-testid="stDataFrame"] ~ div table {
+    .stTable {
         background-color: #2a2a2a !important;
     }
-    div[data-testid="stDataFrame"] ~ div thead tr th {
+    .stTable thead tr th {
         background-color: #ff5757 !important;
         color: white !important;
     }
-    div[data-testid="stDataFrame"] ~ div tbody tr td {
+    .stTable tbody tr td {
         background-color: #2a2a2a !important;
         color: white !important;
     }
@@ -386,22 +362,6 @@ st.markdown("""
     }
 </style>
 """, unsafe_allow_html=True)
-    /* Принудительное переопределение всех таблиц */
-    .stDataFrame, .stDataFrame > div, .stDataFrame > div > div, 
-    .stDataFrame table, .stDataFrame thead, .stDataFrame tbody,
-    .dataframe, .dataframe table, .dataframe thead, .dataframe tbody {
-        background-color: #2a2a2a !important;
-    }
-    
-    .stDataFrame td, .dataframe td {
-        background-color: #2a2a2a !important !important;
-        color: white !important !important;
-    }
-    
-    .stDataFrame th, .dataframe th {
-        background-color: #ff5757 !important !important;
-        color: white !important !important;
-    }
 # ===================================================
 tab1, tab2 = st.tabs(["Калькулятор", "Сохраненные результаты"])
 
