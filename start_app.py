@@ -208,19 +208,21 @@ st.set_page_config(
     page_icon="⛏️",
     layout="wide"
 )
-# ========== ПЛАВАЮЩАЯ КНОПКА ==========
-st.markdown("""
-<style>
-/* Фиксированная кнопка сверху справа */
-.floating-calc {
-    position: fixed;
-    top: 80px;
-    right: 20px;
-    z-index: 999;
-}
+# ========== ПЛАВАЮЩАЯ КНОПКА (РАБОЧАЯ) ==========
+import streamlit.components.v1 as components
 
-/* Стиль кнопки */
-.floating-calc button {
+components.html("""
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+.floating-btn-container {
+    position: fixed;
+    top: 70px;
+    right: 20px;
+    z-index: 99999;
+}
+.floating-btn {
     background: linear-gradient(135deg, #f7931a, #ffb347);
     color: white;
     border: none;
@@ -232,50 +234,58 @@ st.markdown("""
     box-shadow: 0 4px 15px rgba(247, 147, 26, 0.4);
     transition: all 0.3s ease;
     font-family: inherit;
+    display: flex;
+    align-items: center;
+    gap: 8px;
 }
-
-.floating-calc button:hover {
+.floating-btn:hover {
     transform: scale(1.05);
     box-shadow: 0 6px 20px rgba(247, 147, 26, 0.6);
     background: linear-gradient(135deg, #ffb347, #f7931a);
 }
-
-/* Пульсация */
 @keyframes pulse {
-    0% { opacity: 1; }
-    50% { opacity: 0.8; }
-    100% { opacity: 1; }
+    0% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.9; transform: scale(1.02); }
+    100% { opacity: 1; transform: scale(1); }
 }
-.floating-calc button {
-    animation: pulse 1.5s infinite;
+.floating-btn {
+    animation: pulse 2s infinite;
 }
-
 @media (max-width: 768px) {
-    .floating-calc {
-        top: 70px;
+    .floating-btn-container {
+        top: 60px;
         right: 10px;
     }
-    .floating-calc button {
+    .floating-btn {
         padding: 6px 16px;
         font-size: 12px;
     }
 }
 </style>
+</head>
+<body>
+<div class="floating-btn-container">
+    <button class="floating-btn" id="calcBtn">
+        <span>🔄</span> РАСЧЕТ
+    </button>
+</div>
 
-<div class="floating-calc">
-    <button onclick="
-        var btns = parent.document.querySelectorAll('button');
-        for(var i=0; i<btns.length; i++) {
-            if(btns[i].innerText.indexOf('Рассчитать') !== -1 && btns[i].type !== 'submit') {
-                btns[i].click();
+<script>
+    document.getElementById('calcBtn').addEventListener('click', function() {
+        // Ищем кнопку "Рассчитать" на странице
+        var buttons = parent.document.querySelectorAll('button');
+        for (var i = 0; i < buttons.length; i++) {
+            if (buttons[i].innerText.indexOf('Рассчитать') !== -1 && 
+                buttons[i].getAttribute('kind') === 'primary') {
+                buttons[i].click();
                 break;
             }
         }
-    ">
-        🔄 РАСЧЕТ
-    </button>
-</div>
-""", unsafe_allow_html=True)
+    });
+</script>
+</body>
+</html>
+""", height=0)
 # =====================================
 tab1, tab2 = st.tabs(["Калькулятор", "Сохраненные результаты"])
 
