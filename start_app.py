@@ -238,6 +238,25 @@ with tab1:
             key="halving_date"
         )
         
+        st.subheader("Прогнозы на конец расчетного периода")
+        forecast_btc_price = st.number_input(
+            "Прогноз цены Биткоина (тыс. $)",
+            min_value=1.0,
+            value=150.0,
+            step=5.0,
+            key="forecast_btc_price",
+            help="Укажите прогнозируемую цену BTC в тысячах долларов (например, 150 = 150 000 $)"
+        )
+        
+        forecast_usd_rub = st.number_input(
+            "Прогноз курса USD/RUB",
+            min_value=1.0,
+            value=80.0,
+            step=5.0,
+            key="forecast_usd_rub",
+            help="Укажите прогнозируемый курс доллара к рублю"
+        )
+        
         today = datetime.today().date()
         if halving_date > today:
             months_to_halving = (halving_date.year - today.year) * 12 + (halving_date.month - today.month)
@@ -307,6 +326,10 @@ with tab1:
             btc_usd = get_btc_price()
             electricity_usd = electricity / usd_rub
             
+            # Преобразуем прогнозы в реальные значения
+            forecast_btc_price_usd = forecast_btc_price * 1000  # 150 тыс -> 150 000
+            forecast_usd_rub_rate = forecast_usd_rub
+            
             # Получаем данные с whattomine для 1 ASIC
             mining_data_per_asic = get_mining_data_with_retry(
                 asic_hashrate,
@@ -321,7 +344,6 @@ with tab1:
             
             daily_revenue_per_asic_rub = daily_revenue_per_asic_usd * usd_rub
             daily_cost_per_asic_rub = daily_cost_per_asic_usd * usd_rub
-            daily_profit_per_asic_rub = daily_profit_per_asic_usd * usd_rub
             
             # Инициализация
             current_asics = asic_count
@@ -364,7 +386,6 @@ with tab1:
                 revenue = revenue / difficulty_multiplier if difficulty_multiplier > 0 else revenue
                 
                 # ХАЛВИНГ - ЕСЛИ ТЕКУЩАЯ ДАТА ПОСЛЕ ИЛИ РАВНА ДАТЕ ХАЛВИНГА, ДОХОД УМЕНЬШАЕТСЯ В 2 РАЗА
-                # Это работает для ВСЕХ месяцев после халвинга
                 if current_date >= halving_datetime:
                     revenue = revenue * 0.5
                 
@@ -470,6 +491,21 @@ with tab1:
                         "Кошелек RUB": format_number(wallet_btc * btc_usd * usd_rub, 0, 'rub')
                     })
             
+            # Добавляем колонку "Продажа по прогнозу" только в последнюю строку
+            if results:
+                # Рассчитываем значение продажи по прогнозу для последнего месяца
+                last_month_btc = wallet_btc
+                # Прогноз в USD: количество BTC * прогноз цены BTC
+                forecast_value_usd = last_month_btc * forecast_btc_price_usd
+                # Конвертируем в рубли по прогнозному курсу
+                forecast_value_rub = forecast_value_usd * forecast_usd_rub_rate
+                
+                # Добавляем это значение в последнюю строку results
+                if show_in_usd:
+                    results[-1]["Продажа по прогнозу"] = format_number(forecast_value_usd, 0, 'usd')
+                else:
+                    results[-1]["Продажа по прогнозу"] = format_number(forecast_value_rub, 0, 'rub')
+            
             df = pd.DataFrame(results)
             st.session_state.current_results = df
             st.rerun()
@@ -531,6 +567,7 @@ with tab1:
             summary_df = pd.DataFrame(summary_data)
             st.dataframe(summary_df.style.hide(axis="index"), hide_index=True, use_container_width=True)
             
+            # Определяем колонки для отображения
             display_columns = ["Месяц", "ASIC", "Доход", "Комиссия пула", "Электрика", "Расходы", 
                               "Прибыль", "Налог", "Чистая прибыль", "Зарплата", "Реинвест", 
                               "В кошелек", "Накопления", "Кошелек BTC"]
@@ -538,6 +575,10 @@ with tab1:
                 display_columns.append("Кошелек USD")
             else:
                 display_columns.append("Кошелек RUB")
+            
+            # Добавляем колонку "Продажа по прогнозу" если она есть
+            if "Продажа по прогнозу" in df.columns:
+                display_columns.append("Продажа по прогнозу")
             
             formatted_df = df[display_columns].copy()
             for col in ["Доход", "Комиссия пула", "Электрика", "Расходы", "Прибыль", 
@@ -570,6 +611,8 @@ with tab1:
                                     "pool_fee": pool_fee,
                                     "tax_rate": tax_rate,
                                     "halving_date": halving_date.isoformat(),
+                                    "forecast_btc_price": forecast_btc_price,
+                                    "forecast_usd_rub": forecast_usd_rub,
                                     "show_in_usd": show_in_usd,
                                     "usd_rub_rate": usd_rub,
                                     "btc_price_usd": btc_usd,
@@ -609,6 +652,9 @@ with tab2:
                     display_columns.append("Кошелек USD")
                 elif not show_in_usd_saved and "Кошелек RUB" in df.columns:
                     display_columns.append("Кошелек RUB")
+                
+                if "Продажа по прогнозу" in df.columns:
+                    display_columns.append("Продажа по прогнозу")
                 
                 formatted_df = df[display_columns].copy()
                 for col in ["Доход", "Комиссия пула", "Электрика", "Расходы", "Прибыль", 
