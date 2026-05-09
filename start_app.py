@@ -208,10 +208,9 @@ st.set_page_config(
     page_icon="⛏️",
     layout="wide"
 )
-# ========== ПЛАВАЮЩАЯ КНОПКА (РАБОЧАЯ ВЕРСИЯ) ==========
+# ========== ПЛАВАЮЩАЯ КНОПКА ЧЕРЕЗ SESSION_STATE ==========
 st.markdown("""
 <style>
-/* Фиксированная кнопка сверху справа */
 .fixed-top-btn {
     position: fixed;
     top: 70px;
@@ -234,13 +233,11 @@ st.markdown("""
     border: none;
     outline: none;
 }
-
 .fixed-top-btn:hover {
     transform: scale(1.05);
     box-shadow: 0 6px 20px rgba(247, 147, 26, 0.6);
     background: linear-gradient(135deg, #ffb347, #f7931a);
 }
-
 @keyframes pulse {
     0% { opacity: 1; }
     50% { opacity: 0.85; }
@@ -249,7 +246,6 @@ st.markdown("""
 .fixed-top-btn {
     animation: pulse 2s infinite;
 }
-
 @media (max-width: 768px) {
     .fixed-top-btn {
         top: 60px;
@@ -260,23 +256,28 @@ st.markdown("""
 }
 </style>
 
-<a href="#" class="fixed-top-btn" id="floatingCalculateBtn">
+<button class="fixed-top-btn" id="floatingBtn">
     🔄 РАСЧЕТ
-</a>
+</button>
 
 <script>
-    document.getElementById('floatingCalculateBtn').addEventListener('click', function(e) {
-        e.preventDefault();
-        // Находим все кнопки на странице
-        var buttons = document.querySelectorAll('button');
-        for (var i = 0; i < buttons.length; i++) {
-            // Ищем кнопку с текстом "Рассчитать" и типом primary
-            if (buttons[i].innerText.includes('Рассчитать')) {
-                buttons[i].click();
+    document.getElementById('floatingBtn').onclick = function() {
+        // Создаем скрытое поле для передачи в Streamlit
+        var input = document.createElement('input');
+        input.type = 'hidden';
+        input.id = 'float_clicked';
+        input.value = 'true';
+        document.body.appendChild(input);
+        
+        // Находим все кнопки и кликаем по нужной
+        var btns = document.querySelectorAll('button');
+        for(var i = 0; i < btns.length; i++) {
+            if(btns[i].innerText.indexOf('Рассчитать') !== -1 && btns[i].getAttribute('kind') === 'primary') {
+                btns[i].click();
                 break;
             }
         }
-    });
+    };
 </script>
 """, unsafe_allow_html=True)
 # ===================================================
