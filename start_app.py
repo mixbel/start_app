@@ -123,41 +123,14 @@ def get_usd_rub_rate():
     set_cached_data("usd_rub", rate)
     return rate
 
-def get_mining_data_with_retry(hashrate_th, power_w, electricity_cost_usd, retries=3):
-    """Получаем данные о майнинге с повторными попытками"""
-    # Не используем кэш для mining_data, так как параметры меняются
-    for attempt in range(retries):
-        try:
-            params = {
-                "hr": hashrate_th,
-                "p": power_w,
-                "cost": electricity_cost_usd,
-                "fee": 0,
-                "commit": "Calculate"
-            }
-            response = requests.get("https://whattomine.com/coins/1.json", 
-                                 params=params, timeout=10)
-            if response.status_code == 200:
-                data = response.json()
-                result = {
-                    "daily_profit": float(data["profit"].replace('$', '').replace(',', '')),
-                    "daily_revenue": float(data["revenue"].replace('$', '').replace(',', ''))
-                }
-                return result
-        except Exception as e:
-            if attempt == retries - 1:
-                # Возвращаем примерные значения если API не работает
-                return {
-                    "daily_profit": 12.50,
-                    "daily_revenue": 18.00
-                }
-            time.sleep(1 * (attempt + 1))
-    
-    # Если ничего не сработало
-    return {
-        "daily_profit": 12.50,
-        "daily_revenue": 18.00
-    }
+def get_mining_revenue_per_th_per_day():
+    """Получаем доходность 1 TH/s в сутки в USD (фиксированная величина)"""
+    # Базовая доходность на TH/s в сутки ~0.000045 BTC (примерно)
+    # В USD это зависит от курса BTC
+    btc_usd = get_btc_price()
+    # Стандартная доходность: 1 TH/s при текущей сложности дает около 0.000045 BTC в день
+    revenue_btc_per_th = 0.000045
+    return revenue_btc_per_th * btc_usd
 
 # --- Функции для работы со сценариями ---
 def add_scenario():
@@ -316,24 +289,23 @@ with tab1:
             # Получаем данные
             usd_rub = get_usd_rub_rate()
             btc_usd = get_btc_price()
-            electricity_usd = electricity / usd_rub
             
-            # Получаем данные для 1 ASIC
-            mining_data_per_asic = get_mining_data_with_retry(
-                asic_hashrate,
-                asic_power,
-                electricity_usd
-            )
+            # Доходность 1 TH/s в день в USD
+            revenue_per_th_per_day_usd = get_mining_revenue_per_th_per_day()
             
-            # Масштабируем на количество ASIC
-            daily_profit_per_asic_usd = mining_data_per_asic["daily_profit"]
-            daily_cost_per_asic_usd = (asic_power / 1000) * 24 * electricity_usd
+            # Общий хешрейт в TH/s
+            total_hashrate_th = asic_hashrate * asic_count
             
-            daily_profit_per_asic_rub = daily_profit_per_asic_usd * usd_rub
-            daily_cost_per_asic_rub = (asic_power / 1000) * 24 * electricity
+            # Базовый дневной доход в USD (без учета сложности и халвинга)
+            base_daily_revenue_usd = revenue_per_th_per_day_usd * total_hashrate_th
+            
+            # Расходы на электричество
+            daily_power_cost_rub = (asic_power / 1000) * 24 * electricity * asic_count
+            daily_power_cost_usd = daily_power_cost_rub / usd_rub
             
             # Инициализация
             current_asics = asic_count
+            current_hashrate_th = asic_hashrate * current_asics
             savings = 0
             wallet_btc = 0
             results = []
@@ -342,7 +314,7 @@ with tab1:
             total_investment = asic_count * asic_price * usd_rub
             total_investment_usd = asic_count * asic_price
             cumulative_profit = 0
-            cumulative_salary_wallet = 0
+            cumulative_net_profit = 0
             break_even_month = None
             clean_break_even_month = None
             
@@ -352,10 +324,6 @@ with tab1:
             # Преобразуем дату халвинга для сравнения
             halving_datetime = datetime.combine(halving_date, datetime.min.time())
             start_date = datetime.today()
-            
-            # Базовая доходность без учета сложности и халвинга (за месяц на 1 ASIC)
-            base_revenue_rub = daily_profit_per_asic_rub * 30
-            halving_applied = False  # Флаг, чтобы применить халвинг только один раз
             
             for month in range(1, total_months + 1):
                 # Находим активный сценарий для текущего месяца
@@ -375,38 +343,59 @@ with tab1:
                 # Расчет текущей даты
                 current_date = start_date + pd.DateOffset(months=month)
                 
-                # Начальный доход
-                revenue = base_revenue_rub * current_asics
+                # 1. Расчет ДОХОДА (брутто) - зависит только от хешрейта и курсов
+                monthly_revenue = base_daily_revenue_usd * 30
                 
                 # Применяем рост сложности (накопительно)
                 difficulty_multiplier = (1 + difficulty_growth) ** (month - 1)
-                revenue = revenue / difficulty_multiplier if difficulty_multiplier > 0 else revenue
+                monthly_revenue = monthly_revenue / difficulty_multiplier if difficulty_multiplier > 0 else monthly_revenue
                 
-                # Применяем халвинг (если наступила дата и еще не применяли)
-                if current_date >= halving_datetime and not halving_applied:
-                    revenue = revenue * 0.5
-                    halving_applied = True
+                # Применяем халвинг (постоянное снижение после даты)
+                halving_count = 0
+                if current_date >= halving_datetime:
+                    # Рассчитываем сколько халвингов прошло (каждые ~4 года)
+                    years_after_halving = (current_date.year - halving_datetime.year)
+                    halving_count = years_after_halving // 4
+                    if halving_count > 0:
+                        monthly_revenue = monthly_revenue * (0.5 ** halving_count)
+                    else:
+                        monthly_revenue = monthly_revenue * 0.5
                 
-                # Расходы на электричество
-                cost = daily_cost_per_asic_rub * 30 * current_asics
+                # Конвертируем доход в рубли если нужно
+                monthly_revenue_rub = monthly_revenue * usd_rub
                 
-                # Прибыль до вычета комиссии пула и налогов
-                profit_before_pool = revenue - cost
+                # 2. Расходы
+                # Комиссия пула (процент от дохода)
+                pool_fee_amount = monthly_revenue * pool_fee
+                pool_fee_amount_rub = pool_fee_amount * usd_rub
                 
-                # Вычитаем комиссию пула
-                profit_before_tax = profit_before_pool * (1 - pool_fee)
+                # Электрика
+                electricity_cost = daily_power_cost_usd * 30
+                electricity_cost_rub = electricity_cost * usd_rub
                 
-                # Вычитаем налог (только если прибыль положительная)
+                # Общие расходы
+                total_costs = pool_fee_amount + electricity_cost
+                total_costs_rub = total_costs * usd_rub
+                
+                # 3. Прибыль до налога
+                profit_before_tax = monthly_revenue - total_costs
+                profit_before_tax_rub = profit_before_tax * usd_rub
+                
+                # 4. Налог (только если прибыль положительная)
                 if profit_before_tax > 0:
                     tax = profit_before_tax * tax_rate
-                    profit = profit_before_tax - tax
+                    tax_rub = tax * usd_rub
+                    net_profit = profit_before_tax - tax
+                    net_profit_rub = net_profit * usd_rub
                 else:
                     tax = 0
-                    profit = profit_before_tax
+                    tax_rub = 0
+                    net_profit = profit_before_tax
+                    net_profit_rub = profit_before_tax_rub
                 
-                # Распределение средств
-                to_reinvest = profit * (reinvest_percent / 100)
-                salary = profit - to_reinvest
+                # Распределение чистой прибыли
+                to_reinvest = net_profit * (reinvest_percent / 100)
+                salary = net_profit - to_reinvest
                 
                 to_wallet = to_reinvest * (wallet_percent / 100)
                 to_asics = to_reinvest - to_wallet
@@ -414,54 +403,47 @@ with tab1:
                 savings += to_asics
                 
                 # Пополнение кошелька в BTC
-                if show_in_usd:
-                    btc_amount = to_wallet / btc_usd
-                else:
-                    btc_amount = (to_wallet / usd_rub) / btc_usd
+                btc_amount = to_wallet / btc_usd
                 wallet_btc += btc_amount
                 
                 # Покупка ASIC
-                asic_price_local = asic_price * usd_rub if not show_in_usd else asic_price
-                if savings >= asic_price_local:
-                    new_asics = int(savings // asic_price_local)
+                if savings >= asic_price:
+                    new_asics = int(savings // asic_price)
                     current_asics += new_asics
-                    savings -= new_asics * asic_price_local
+                    current_hashrate_th = asic_hashrate * current_asics
+                    savings -= new_asics * asic_price
+                    # Пересчитываем базовый доход с новым хешрейтом
+                    base_daily_revenue_usd = revenue_per_th_per_day_usd * current_hashrate_th
                 
-                # Расчет окупаемости (грязная - по прибыли)
-                cumulative_profit += profit
-                investment_for_break_even = total_investment if not show_in_usd else total_investment_usd
+                # Расчет окупаемости грязная (по прибыли до налога)
+                cumulative_profit += profit_before_tax
+                investment_for_break_even = total_investment_usd if show_in_usd else total_investment
                 if cumulative_profit >= investment_for_break_even and break_even_month is None:
                     break_even_month = month
                 
-                # Расчет чистой окупаемости (зарплата + кошелек)
-                current_salary_wallet = salary + to_wallet
-                cumulative_salary_wallet += current_salary_wallet
+                # Расчет чистой окупаемости (зарплата + кошелек в той же валюте)
+                current_salary_wallet = (salary + to_wallet)
+                cumulative_net_profit += net_profit
                 
-                if cumulative_salary_wallet >= investment_for_break_even and clean_break_even_month is None:
+                if cumulative_net_profit >= investment_for_break_even and clean_break_even_month is None:
                     clean_break_even_month = month
                 
-                # Конвертация в доллары если выбрано
+                # Формируем результат в зависимости от выбранной валюты
                 if show_in_usd:
-                    revenue_usd = revenue / usd_rub
-                    cost_usd = cost / usd_rub
-                    profit_usd = profit / usd_rub
-                    salary_usd = salary / usd_rub
-                    to_reinvest_usd = to_reinvest / usd_rub
-                    to_wallet_usd = to_wallet / usd_rub
-                    savings_usd = savings / usd_rub
-                    tax_usd = tax / usd_rub
-                    
                     results.append({
                         "Месяц": month,
                         "ASIC": current_asics,
-                        "Доход": int(revenue_usd),
-                        "Расходы": int(cost_usd),
-                        "Налог": int(tax_usd),
-                        "Прибыль": int(profit_usd),
-                        "Зарплата": int(salary_usd),
-                        "Реинвест": int(to_reinvest_usd),
-                        "В кошелек": int(to_wallet_usd),
-                        "Накопления": int(savings_usd),
+                        "Доход": int(monthly_revenue),
+                        "Комиссия пула": int(pool_fee_amount),
+                        "Электрика": int(electricity_cost),
+                        "Расходы": int(total_costs),
+                        "Прибыль": int(profit_before_tax),
+                        "Налог": int(tax),
+                        "Чистая прибыль": int(net_profit),
+                        "Зарплата": int(salary),
+                        "Реинвест": int(to_reinvest),
+                        "В кошелек": int(to_wallet),
+                        "Накопления": int(savings),
                         "Кошелек BTC": f"{wallet_btc:.8f} BTC",
                         "Кошелек USD": format_number(wallet_btc * btc_usd, 2, 'usd')
                     })
@@ -469,14 +451,17 @@ with tab1:
                     results.append({
                         "Месяц": month,
                         "ASIC": current_asics,
-                        "Доход": int(revenue),
-                        "Расходы": int(cost),
-                        "Налог": int(tax),
-                        "Прибыль": int(profit),
-                        "Зарплата": int(salary),
-                        "Реинвест": int(to_reinvest),
-                        "В кошелек": int(to_wallet),
-                        "Накопления": int(savings),
+                        "Доход": int(monthly_revenue_rub),
+                        "Комиссия пула": int(pool_fee_amount_rub),
+                        "Электрика": int(electricity_cost_rub),
+                        "Расходы": int(total_costs_rub),
+                        "Прибыль": int(profit_before_tax_rub),
+                        "Налог": int(tax_rub),
+                        "Чистая прибыль": int(net_profit_rub),
+                        "Зарплата": int(salary * usd_rub),
+                        "Реинвест": int(to_reinvest * usd_rub),
+                        "В кошелек": int(to_wallet * usd_rub),
+                        "Накопления": int(savings * usd_rub),
                         "Кошелек BTC": f"{wallet_btc:.8f} BTC",
                         "Кошелек RUB": format_number(wallet_btc * btc_usd * usd_rub, 0, 'rub')
                     })
@@ -499,17 +484,15 @@ with tab1:
             # Первоначальные инвестиции
             initial_investment = asic_count * asic_price * (usd_rub if not show_in_usd else 1)
             
-            # Окупаемость чистая (по зарплате + кошелек) - пересчитываем из данных
-            cumulative_salary_wallet = 0
+            # Окупаемость по чистой прибыли
+            cumulative_net = df['Чистая прибыль'].cumsum()
             clean_break_even_month = None
             for _, row in df.iterrows():
-                salary = row['Зарплата']
-                wallet_value = row['В кошелек']
-                cumulative_salary_wallet += salary + wallet_value
-                if cumulative_salary_wallet >= initial_investment and clean_break_even_month is None:
+                if cumulative_net[row['Месяц']-1] >= initial_investment:
                     clean_break_even_month = row['Месяц']
+                    break
             
-            # Окупаемость грязная (по прибыли)
+            # Окупаемость по прибыли до налога
             cumulative_profit = df['Прибыль'].cumsum()
             dirty_break_even_month = None
             for _, row in df.iterrows():
@@ -517,10 +500,14 @@ with tab1:
                     dirty_break_even_month = row['Месяц']
                     break
             
-            # Общая прибыль и затраты
-            total_profit = df['Прибыль'].sum()
-            total_electricity = df['Расходы'].sum()
-            total_tax = df['Налог'].sum() if 'Налог' in df.columns else 0
+            # Общие показатели
+            total_revenue = df['Доход'].sum()
+            total_pool_fee = df['Комиссия пула'].sum()
+            total_electricity = df['Электрика'].sum()
+            total_costs = df['Расходы'].sum()
+            total_profit_before_tax = df['Прибыль'].sum()
+            total_tax = df['Налог'].sum()
+            total_net_profit = df['Чистая прибыль'].sum()
             final_btc = float(df.iloc[-1]['Кошелек BTC'].split()[0]) if 'Кошелек BTC' in df.columns else 0
             final_asics = df.iloc[-1]['ASIC']
             
@@ -528,11 +515,15 @@ with tab1:
             summary_data = {
                 "Показатель": [
                     "Первоначальные инвестиции", 
-                    "Окупаемость чистая (мес)", 
-                    "Окупаемость грязная (мес)",
-                    "Общая прибыль",
+                    "Окупаемость по чистой прибыли (мес)", 
+                    "Окупаемость по прибыли до налога (мес)",
+                    "Общий доход",
+                    "Общая комиссия пула",
+                    "Общие расходы на электрику",
+                    "Общие расходы",
+                    "Прибыль до налога",
                     "Общий налог",
-                    "Сумма за электрику",
+                    "Чистая прибыль",
                     "Финальное кол-во ASIC",
                     "Накоплено BTC"
                 ],
@@ -540,9 +531,13 @@ with tab1:
                     format_number(initial_investment, 0, "usd" if show_in_usd else "rub"),
                     str(clean_break_even_month) if clean_break_even_month else "Не окупилось",
                     str(dirty_break_even_month) if dirty_break_even_month else "Не окупилось",
-                    format_number(total_profit, 0, "usd" if show_in_usd else "rub"),
-                    format_number(total_tax, 0, "usd" if show_in_usd else "rub"),
+                    format_number(total_revenue, 0, "usd" if show_in_usd else "rub"),
+                    format_number(total_pool_fee, 0, "usd" if show_in_usd else "rub"),
                     format_number(total_electricity, 0, "usd" if show_in_usd else "rub"),
+                    format_number(total_costs, 0, "usd" if show_in_usd else "rub"),
+                    format_number(total_profit_before_tax, 0, "usd" if show_in_usd else "rub"),
+                    format_number(total_tax, 0, "usd" if show_in_usd else "rub"),
+                    format_number(total_net_profit, 0, "usd" if show_in_usd else "rub"),
                     f"{final_asics} шт.",
                     f"{final_btc:.8f} BTC"
                 ]
@@ -557,8 +552,10 @@ with tab1:
                 use_container_width=True
             )
             
-            # Выбираем колонки для отображения
-            display_columns = ["Месяц", "ASIC", "Доход", "Расходы", "Налог", "Прибыль", "Зарплата", "Реинвест", "В кошелек", "Накопления", "Кошелек BTC"]
+            # Выбираем колонки для отображения в правильном порядке
+            display_columns = ["Месяц", "ASIC", "Доход", "Комиссия пула", "Электрика", "Расходы", 
+                              "Прибыль", "Налог", "Чистая прибыль", "Зарплата", "Реинвест", 
+                              "В кошелек", "Накопления", "Кошелек BTC"]
             if show_in_usd:
                 display_columns.append("Кошелек USD")
             else:
@@ -566,7 +563,8 @@ with tab1:
             
             # Форматируем и отображаем таблицу
             formatted_df = df[display_columns].copy()
-            for col in ["Доход", "Расходы", "Налог", "Прибыль", "Зарплата", "Реинвест", "В кошелек", "Накопления"]:
+            for col in ["Доход", "Комиссия пула", "Электрика", "Расходы", "Прибыль", 
+                       "Налог", "Чистая прибыль", "Зарплата", "Реинвест", "В кошелек", "Накопления"]:
                 if col in formatted_df.columns:
                     formatted_df[col] = formatted_df[col].apply(lambda x: format_number(x, 0, "usd" if show_in_usd else "rub"))
             
@@ -661,14 +659,17 @@ with tab2:
                 show_in_usd_saved = data["params"].get("show_in_usd", False)
                 
                 # Форматируем для отображения
-                display_columns = ["Месяц", "ASIC", "Доход", "Расходы", "Налог", "Прибыль", "Зарплата", "Реинвест", "В кошелек", "Накопления", "Кошелек BTC"]
+                display_columns = ["Месяц", "ASIC", "Доход", "Комиссия пула", "Электрика", "Расходы", 
+                                  "Прибыль", "Налог", "Чистая прибыль", "Зарплата", "Реинвест", 
+                                  "В кошелек", "Накопления", "Кошелек BTC"]
                 if show_in_usd_saved and "Кошелек USD" in df.columns:
                     display_columns.append("Кошелек USD")
                 elif not show_in_usd_saved and "Кошелек RUB" in df.columns:
                     display_columns.append("Кошелек RUB")
                 
                 formatted_df = df[display_columns].copy()
-                for col in ["Доход", "Расходы", "Налог", "Прибыль", "Зарплата", "Реинвест", "В кошелек", "Накопления"]:
+                for col in ["Доход", "Комиссия пула", "Электрика", "Расходы", "Прибыль", 
+                           "Налог", "Чистая прибыль", "Зарплата", "Реинвест", "В кошелек", "Накопления"]:
                     if col in formatted_df.columns:
                         formatted_df[col] = formatted_df[col].apply(lambda x: format_number(x, 0, "usd" if show_in_usd_saved else "rub"))
                 
