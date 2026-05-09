@@ -208,14 +208,12 @@ st.set_page_config(
     page_icon="⛏️",
     layout="wide"
 )
-# ========== ЗАГОЛОВОК С ЛОГОТИПОМ (ЦЕНТР) ==========
+# ========== ЗАГОЛОВОК С ЛОГОТИПОМ (ЦЕНТР, логотип сверху) ==========
 col1, col2, col3 = st.columns([1, 2, 1])
 with col2:
-    col_logo, col_text, col_empty = st.columns([1, 3, 0.5])  # вместо 0 поставь 0.5
-    with col_logo:
-        st.image("89120564-6.png", width=60)
-    with col_text:
-        st.markdown("<h1 style='text-align: center; margin-top: -90px;'>Калькулятор от Gazminer</h1>", unsafe_allow_html=True)
+    col_logo, col_text, col_empty = st.columns([2.5, 3, 0])
+    st.image("89120564-6.png", width=300)
+    st.markdown("<h1 style='text-align: center; margin-top: -90px;'>Калькулятор от Gazminer</h1>", unsafe_allow_html=True)
     with col_empty:
         st.write("")
 st.markdown("---")
