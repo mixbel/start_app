@@ -208,18 +208,19 @@ st.set_page_config(
     page_icon="⛏️",
     layout="wide"
 )
-# ========== АЛЬТЕРНАТИВНАЯ ПЛАВАЮЩАЯ КНОПКА ==========
-import streamlit.components.v1 as components
-
-components.html("""
+# ========== ПЛАВАЮЩАЯ КНОПКА ==========
+st.markdown("""
 <style>
-.fixed-calc-btn {
+/* Фиксированная кнопка сверху справа */
+.floating-calc {
     position: fixed;
-    top: 70px;
+    top: 80px;
     right: 20px;
     z-index: 999;
 }
-.fixed-calc-btn button {
+
+/* Стиль кнопки */
+.floating-calc button {
     background: linear-gradient(135deg, #f7931a, #ffb347);
     color: white;
     border: none;
@@ -230,19 +231,43 @@ components.html("""
     cursor: pointer;
     box-shadow: 0 4px 15px rgba(247, 147, 26, 0.4);
     transition: all 0.3s ease;
+    font-family: inherit;
 }
-.fixed-calc-btn button:hover {
+
+.floating-calc button:hover {
     transform: scale(1.05);
     box-shadow: 0 6px 20px rgba(247, 147, 26, 0.6);
+    background: linear-gradient(135deg, #ffb347, #f7931a);
+}
+
+/* Пульсация */
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.8; }
+    100% { opacity: 1; }
+}
+.floating-calc button {
+    animation: pulse 1.5s infinite;
+}
+
+@media (max-width: 768px) {
+    .floating-calc {
+        top: 70px;
+        right: 10px;
+    }
+    .floating-calc button {
+        padding: 6px 16px;
+        font-size: 12px;
+    }
 }
 </style>
 
-<div class="fixed-calc-btn">
+<div class="floating-calc">
     <button onclick="
-        const btns = document.querySelectorAll('button');
-        for(let btn of btns) {
-            if(btn.innerText.includes('Рассчитать') && btn.type !== 'submit') {
-                btn.click();
+        var btns = parent.document.querySelectorAll('button');
+        for(var i=0; i<btns.length; i++) {
+            if(btns[i].innerText.indexOf('Рассчитать') !== -1 && btns[i].type !== 'submit') {
+                btns[i].click();
                 break;
             }
         }
@@ -250,8 +275,8 @@ components.html("""
         🔄 РАСЧЕТ
     </button>
 </div>
-""", height=0)
-# ===================================================
+""", unsafe_allow_html=True)
+# =====================================
 tab1, tab2 = st.tabs(["Калькулятор", "Сохраненные результаты"])
 
 with tab1:
