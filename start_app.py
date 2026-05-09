@@ -117,6 +117,9 @@ with tab1:
 
         results=[]
         start_date = datetime.today()
+        
+        # Преобразуем halving_date в datetime для корректного сравнения
+        halving_datetime = datetime.combine(halving_date, datetime.min.time())
 
         for month in range(1,37):
 
@@ -127,8 +130,8 @@ with tab1:
             # сложность
             base_income /= (1 + difficulty_growth)**month
 
-            # халвинг
-            if current_date >= halving_date:
+            # халвинг - исправлено сравнение
+            if current_date >= halving_datetime:
                 base_income *= 0.5
 
             # аптайм
