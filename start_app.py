@@ -3,7 +3,9 @@ import pandas as pd
 import requests
 import time
 from datetime import datetime, timedelta
-
+# Инициализация флага для плавающей кнопки
+if 'trigger_calculation' not in st.session_state:
+    st.session_state.trigger_calculation = False
 # Настройки API
 API_CONFIG = {
     "coingecko": {
@@ -208,79 +210,7 @@ st.set_page_config(
     page_icon="⛏️",
     layout="wide"
 )
-# ========== ПЛАВАЮЩАЯ КНОПКА ЧЕРЕЗ SESSION_STATE ==========
-st.markdown("""
-<style>
-.fixed-top-btn {
-    position: fixed;
-    top: 70px;
-    right: 20px;
-    z-index: 99999;
-    background: linear-gradient(135deg, #f7931a, #ffb347);
-    color: white;
-    border: none;
-    padding: 10px 24px;
-    border-radius: 30px;
-    font-size: 16px;
-    font-weight: bold;
-    cursor: pointer;
-    box-shadow: 0 4px 15px rgba(247, 147, 26, 0.4);
-    transition: all 0.3s ease;
-    font-family: inherit;
-    text-decoration: none;
-    display: inline-block;
-    text-align: center;
-    border: none;
-    outline: none;
-}
-.fixed-top-btn:hover {
-    transform: scale(1.05);
-    box-shadow: 0 6px 20px rgba(247, 147, 26, 0.6);
-    background: linear-gradient(135deg, #ffb347, #f7931a);
-}
-@keyframes pulse {
-    0% { opacity: 1; }
-    50% { opacity: 0.85; }
-    100% { opacity: 1; }
-}
-.fixed-top-btn {
-    animation: pulse 2s infinite;
-}
-@media (max-width: 768px) {
-    .fixed-top-btn {
-        top: 60px;
-        right: 10px;
-        padding: 6px 16px;
-        font-size: 12px;
-    }
-}
-</style>
 
-<button class="fixed-top-btn" id="floatingBtn">
-    🔄 РАСЧЕТ
-</button>
-
-<script>
-    document.getElementById('floatingBtn').onclick = function() {
-        // Создаем скрытое поле для передачи в Streamlit
-        var input = document.createElement('input');
-        input.type = 'hidden';
-        input.id = 'float_clicked';
-        input.value = 'true';
-        document.body.appendChild(input);
-        
-        // Находим все кнопки и кликаем по нужной
-        var btns = document.querySelectorAll('button');
-        for(var i = 0; i < btns.length; i++) {
-            if(btns[i].innerText.indexOf('Рассчитать') !== -1 && btns[i].getAttribute('kind') === 'primary') {
-                btns[i].click();
-                break;
-            }
-        }
-    };
-</script>
-""", unsafe_allow_html=True)
-# ===================================================
 tab1, tab2 = st.tabs(["Калькулятор", "Сохраненные результаты"])
 
 with tab1:
@@ -391,7 +321,57 @@ with tab1:
         if st.button("➕ Добавить период"):
             add_scenario()
             st.rerun()
-
+  # ========== ПЛАВАЮЩАЯ КНОПКА ==========
+        st.markdown("""
+        <style>
+        .float-btn-container {
+            position: fixed;
+            top: 70px;
+            right: 20px;
+            z-index: 99999;
+        }
+        .custom-float-btn {
+            background: linear-gradient(135deg, #f7931a, #ffb347);
+            color: white;
+            border: none;
+            padding: 10px 24px;
+            border-radius: 30px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(247, 147, 26, 0.4);
+            transition: all 0.3s ease;
+            width: 100%;
+            text-align: center;
+        }
+        .custom-float-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 6px 20px rgba(247, 147, 26, 0.6);
+        }
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.85; }
+            100% { opacity: 1; }
+        }
+        .custom-float-btn {
+            animation: pulse 2s infinite;
+        }
+        </style>
+        <div class="float-btn-container">
+            <button class="custom-float-btn" onclick="
+                var btns = document.querySelectorAll('button');
+                for(var i=0; i<btns.length; i++) {
+                    if(btns[i].innerText.indexOf('Рассчитать') !== -1 && btns[i].getAttribute('kind') === 'primary') {
+                        btns[i].click();
+                        break;
+                    }
+                }
+            ">
+                🔄 РАСЧЕТ
+            </button>
+        </div>
+        """, unsafe_allow_html=True)
+        # =====================================
     if st.button("🔄 Рассчитать", type="primary", use_container_width=True, key="calculate_btn"):
         with st.spinner("Выполняю расчет..."):
             usd_rub = get_usd_rub_rate()
