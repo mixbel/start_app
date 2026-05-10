@@ -45,7 +45,6 @@ if 'scenarios' not in st.session_state:
 
 # --- Функции для работы с API ---
 def get_cached_data(key):
-    """Получаем данные из кэша если они актуальны"""
     if API_CACHE[key]["value"] and API_CACHE[key]["timestamp"]:
         elapsed = time.time() - API_CACHE[key]["timestamp"]
         if elapsed < API_CACHE[key]["expires"]:
@@ -53,12 +52,10 @@ def get_cached_data(key):
     return None
 
 def set_cached_data(key, value):
-    """Обновляем данные в кэше"""
     API_CACHE[key]["value"] = value
     API_CACHE[key]["timestamp"] = time.time()
 
 def fetch_with_fallback(urls, parse_funcs):
-    """Пытаемся получить данные из нескольких источников"""
     for url, parse_func in zip(urls, parse_funcs):
         try:
             response = requests.get(url, timeout=5)
@@ -72,7 +69,6 @@ def fetch_with_fallback(urls, parse_funcs):
     return None
 
 def get_btc_price():
-    """Получаем курс BTC с нескольких бирж"""
     cached = get_cached_data("btc_price")
     if cached:
         return cached
@@ -99,7 +95,6 @@ def get_btc_price():
     return price
 
 def get_usd_rub_rate():
-    """Получаем курс USD/RUB с нескольких источников"""
     cached = get_cached_data("usd_rub")
     if cached:
         return cached
@@ -126,7 +121,6 @@ def get_usd_rub_rate():
     return rate
 
 def get_mining_data_with_retry(hashrate_th, power_w, electricity_cost_usd, retries=3):
-    """Получаем данные о майнинге с повторными попытками"""
     for attempt in range(retries):
         try:
             params = {
@@ -187,7 +181,6 @@ def remove_scenario(index):
 
 # --- Функция для экспорта в Excel ---
 def export_to_excel(df):
-    """Экспортирует DataFrame в Excel с форматированием"""
     output = BytesIO()
     
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
@@ -219,7 +212,6 @@ def export_to_excel(df):
 
 # --- Основные функции калькулятора ---
 def format_number(value, decimals=0, currency="rub"):
-    """Форматирует число с пробелами между тысячами"""
     if pd.isna(value) or value == 0:
         return "0"
     try:
@@ -278,7 +270,6 @@ st.markdown("""
 tab1, tab2 = st.tabs(["Калькулятор", "Сохраненные результаты"])
 
 with tab1:
-    
     col_params, col_results = st.columns([1, 2], gap="large")
     
     with col_params:
@@ -327,17 +318,17 @@ with tab1:
         if halving_date > today:
             months_to_halving = (halving_date.year - today.year) * 12 + (halving_date.month - today.month)
             if months_to_halving <= 1:
-                st.info(f"⚠️ Халвинг наступит через {months_to_halving} месяц(ев)")
+                st.info(f"Халвинг наступит через {months_to_halving} месяц(ев)")
             else:
-                st.info(f"📅 Халвинг наступит через {months_to_halving} месяцев")
+                st.info(f"Халвинг наступит через {months_to_halving} месяцев")
         elif halving_date == today:
-            st.warning("⚠️ Халвинг наступает сегодня!")
+            st.warning("Халвинг наступает сегодня!")
         else:
-            st.warning("⚠️ Выбранная дата уже прошла, халвинг уже должен был произойти")
+            st.warning("Выбранная дата уже прошла, халвинг уже должен был произойти")
         
         show_in_usd = st.checkbox("Показать расчеты в $", value=False, key="show_in_usd")
         
-        if st.button("🔄 Обновить курсы"):
+        if st.button("Обновить курсы"):
             for key in API_CACHE:
                 API_CACHE[key]["value"] = None
                 API_CACHE[key]["timestamp"] = None
@@ -371,7 +362,7 @@ with tab1:
                 wallet = st.slider("В кошелек % из реинвеста", 0, 100, scenario['wallet'], 
                                  key=f"wallet_{i}")
                 
-                if st.button("❌ Удалить", key=f"remove_{i}"):
+                if st.button("Удалить", key=f"remove_{i}"):
                     remove_scenario(i)
                     st.rerun()
                 
@@ -382,11 +373,11 @@ with tab1:
                     "wallet": wallet
                 }
 
-        if st.button("➕ Добавить период"):
+        if st.button("Добавить период"):
             add_scenario()
             st.rerun()
 
-    if st.button("🔄 Рассчитать", type="primary", use_container_width=True, key="calculate_btn"):
+    if st.button("Рассчитать", type="primary", use_container_width=True, key="calculate_btn"):
         with st.spinner("Выполняю расчет..."):
             usd_rub = get_usd_rub_rate()
             btc_usd = get_btc_price()
@@ -440,21 +431,15 @@ with tab1:
                 
                 current_date = start_date + pd.DateOffset(months=month)
                 
-                # Доход при 100% аптайме
                 revenue_full = daily_revenue_per_asic_rub * 30 * current_asics
                 
-                # Рост сложности
                 difficulty_multiplier = (1 + difficulty_growth) ** (month - 1)
                 revenue_full = revenue_full / difficulty_multiplier if difficulty_multiplier > 0 else revenue_full
                 
-                # Халвинг
                 if current_date >= halving_datetime:
                     revenue_full = revenue_full * 0.5
                 
-                # Фактический доход с учетом аптайма
                 revenue = revenue_full * uptime
-                
-                # Потерянный доход из-за аптайма
                 lost_revenue = revenue_full - revenue
                 
                 pool_fee_amount = revenue * pool_fee
@@ -618,9 +603,11 @@ with tab1:
             summary_df = pd.DataFrame(summary_data)
             st.dataframe(summary_df.style.hide(axis="index"), hide_index=True, use_container_width=True)
             
-            display_columns = ["Месяц", "ASIC", "Доход", "Комиссия пула", "Электрика", "Расходы", 
-                              "Прибыль", "Налог", "Потерянный доход", "Чистая прибыль", 
-                              "Зарплата", "Реинвест", "В кошелек", "Накопления", "Кошелек BTC"]
+            display_columns = [
+                "Месяц", "ASIC", "Доход", "Комиссия пула", "Электрика", "Расходы", 
+                "Прибыль", "Налог", "Потерянный доход", "Чистая прибыль", 
+                "Зарплата", "Реинвест", "В кошелек", "Накопления", "Кошелек BTC"
+            ]
             if show_in_usd:
                 display_columns.append("Кошелек USD")
             else:
@@ -638,15 +625,14 @@ with tab1:
             
             st.dataframe(formatted_df, hide_index=True, use_container_width=True, height=700)
             
-            # Кнопка экспорта в Excel
             col_export1, col_export2, col_export3 = st.columns([1, 2, 1])
             with col_export2:
-                if st.button("📥 Скачать результаты в Excel", type="secondary", use_container_width=True):
+                if st.button("Скачать результаты в Excel", type="secondary", use_container_width=True):
                     with st.spinner("Подготавливаю файл..."):
                         export_df = df[display_columns].copy()
                         excel_file = export_to_excel(export_df)
                         st.download_button(
-                            label="📊 Скачать Excel файл",
+                            label="Скачать Excel файл",
                             data=excel_file,
                             file_name=f"mining_results_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
                             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -657,7 +643,7 @@ with tab1:
                 result_name = st.text_input("Название сохранения", 
                                           value=f"Результат {datetime.now().strftime('%Y-%m-%d %H:%M')}")
                 
-                if st.form_submit_button("💾 Сохранить результаты"):
+                if st.form_submit_button("Сохранить результаты"):
                     if result_name.strip():
                         if result_name in st.session_state.saved_results:
                             st.error("Результат с таким названием уже существует!")
@@ -691,7 +677,7 @@ with tab1:
                         st.error("Введите название для сохранения")
 
 with tab2:
-    st.title("📁 Сохраненные результаты")
+    st.title("Сохраненные результаты")
     
     if not st.session_state.get('saved_results', {}):
         st.info("Нет сохраненных результатов")
@@ -699,7 +685,7 @@ with tab2:
         saved_results_copy = st.session_state.saved_results.copy()
         
         for name, data in saved_results_copy.items():
-            with st.expander(f"📌 {name} ({data['timestamp']})"):
+            with st.expander(f"{name} ({data['timestamp']})"):
                 st.write("Параметры расчета:")
                 st.json(data["params"])
                 
@@ -711,9 +697,11 @@ with tab2:
                 df = pd.DataFrame(data["data"])
                 show_in_usd_saved = data["params"].get("show_in_usd", False)
                 
-                display_columns = ["Месяц", "ASIC", "Доход", "Комиссия пула", "Электрика", "Расходы", 
-                                  "Прибыль", "Налог", "Потерянный доход", "Чистая прибыль", 
-                                  "Зарплата", "Реинвест", "В кошелек", "Накопления", "Кошелек BTC"]
+                display_columns = [
+                    "Месяц", "ASIC", "Доход", "Комиссия пула", "Электрика", "Расходы", 
+                    "Прибыль", "Налог", "Потерянный доход", "Чистая прибыль", 
+                    "Зарплата", "Реинвест", "В кошелек", "Накопления", "Кошелек BTC"
+                ]
                 if show_in_usd_saved and "Кошелек USD" in df.columns:
                     display_columns.append("Кошелек USD")
                 elif not show_in_usd_saved and "Кошелек RUB" in df.columns:
@@ -724,4 +712,13 @@ with tab2:
                 
                 formatted_df = df[display_columns].copy()
                 for col in ["Доход", "Комиссия пула", "Электрика", "Расходы", "Прибыль", 
-                           "
+                           "Налог", "Потерянный доход", "Чистая прибыль", "Зарплата", 
+                           "Реинвест", "В кошелек", "Накопления"]:
+                    if col in formatted_df.columns:
+                        formatted_df[col] = formatted_df[col].apply(lambda x: format_number(x, 0, "usd" if show_in_usd_saved else "rub"))
+                
+                st.dataframe(formatted_df, hide_index=True, use_container_width=True)
+                
+                if st.button(f"Удалить {name}", key=f"delete_{name}"):
+                    del st.session_state.saved_results[name]
+                    st.rerun()
