@@ -2,6 +2,8 @@ import streamlit as st
 import pandas as pd
 import requests
 import time
+import openpyxl
+from io import BytesIO
 from datetime import datetime, timedelta
 
 # Настройки API
@@ -183,6 +185,40 @@ def remove_scenario(index):
             st.session_state.scenarios[i]["start"] = st.session_state.scenarios[i-1]["end"] + 1
         st.session_state.scenarios[i]["end"] = st.session_state.scenarios[i]["start"] + 11
 
+# --- Функция для экспорта в Excel ---
+def export_to_excel(df, filename="mining_results.xlsx"):
+    """Экспортирует DataFrame в Excel с форматированием"""
+    output = BytesIO()
+    
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, sheet_name='Результаты майнинга', index=False)
+        
+        workbook = writer.book
+        worksheet = writer.sheets['Результаты майнинга']
+        
+        # Форматируем заголовки
+        for col in range(1, len(df.columns) + 1):
+            cell = worksheet.cell(row=1, column=col)
+            cell.font = openpyxl.styles.Font(bold=True, color="FFFFFF")
+            cell.fill = openpyxl.styles.PatternFill(start_color="FF5757", end_color="FF5757", fill_type="solid")
+            cell.alignment = openpyxl.styles.Alignment(horizontal="center")
+        
+        # Автоматически подгоняем ширину колонок
+        for column in worksheet.columns:
+            max_length = 0
+            column_letter = column[0].column_letter
+            for cell in column:
+                try:
+                    if len(str(cell.value)) > max_length:
+                        max_length = len(str(cell.value))
+                except:
+                    pass
+            adjusted_width = min(max_length + 2, 30)
+            worksheet.column_dimensions[column_letter].width = adjusted_width
+    
+    output.seek(0)
+    return output
+
 # --- Основные функции калькулятора ---
 def format_number(value, decimals=0, currency="rub"):
     """Форматирует число с пробелами между тысячами"""
@@ -208,16 +244,20 @@ st.set_page_config(
     page_icon="⛏️",
     layout="wide"
 )
+
 # ========== ЗАГОЛОВОК С ЛОГОТИПОМ (ЦЕНТР, логотип сверху) ==========
 col1, col2, col3 = st.columns([1, 2, 1])
 with col2:
     col_logo, col_text, col_empty = st.columns([2.5, 3, 0.5])
-    st.image("89120564-6.png", width=300)
-    st.markdown("<h1 style='text-align: center; margin-top: -90px; padding-left: 50px;'>Калькулятор от Gazminer</h1>", unsafe_allow_html=True)
+    with col_logo:
+        st.image("89120564-6.png", width=300)
+    with col_text:
+        st.markdown("<h1 style='margin: 0; text-align: center;'>Калькулятор от Gazminer</h1>", unsafe_allow_html=True)
     with col_empty:
         st.write("")
 st.markdown("---")
 # ===================================================
+
 # ========== КАСТОМНЫЙ ДИЗАЙН ==========
 st.markdown("""
 <style>
@@ -348,6 +388,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 # ===================================================
+
 tab1, tab2 = st.tabs(["Калькулятор", "Сохраненные результаты"])
 
 with tab1:
@@ -695,6 +736,36 @@ with tab1:
             
             st.dataframe(formatted_df, hide_index=True, use_container_width=True, height=700)
             
+            # ========== КНОПКА ЭКСПОРТА В EXCEL ==========
+            col_export1, col_export2, col_export3 = st.columns([1, 2, 1])
+            with col_export2:
+                if st.button("📥 Скачать результаты в Excel", type="secondary", use_container_width=True):
+                    with st.spinner("Подготавливаю файл..."):
+                        # Подготавливаем DataFrame для экспорта
+                        export_df = df[display_columns].copy()
+                        # Убираем символы валют и преобразуем в числа
+                        for col in ["Доход", "Комиссия пула", "Электрика", "Расходы", "Прибыль", 
+                                   "Налог", "Чистая прибыль", "Зарплата", "Реинвест", "В кошелек", "Накопления"]:
+                            if col in export_df.columns:
+                                try:
+                                    # Пробуем преобразовать в число
+                                    export_df[col] = pd.to_numeric(export_df[col], errors='coerce')
+                                except:
+                                    pass
+                        
+                        # Создаем Excel файл
+                        excel_file = export_to_excel(export_df)
+                        
+                        # Предлагаем скачать
+                        st.download_button(
+                            label="📊 Скачать Excel файл",
+                            data=excel_file,
+                            file_name=f"mining_results_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx",
+                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                            use_container_width=True
+                        )
+            # ===============================================
+            
             with st.form("save_form"):
                 result_name = st.text_input("Название сохранения", 
                                           value=f"Результат {datetime.now().strftime('%Y-%m-%d %H:%M')}")
@@ -723,54 +794,4 @@ with tab1:
                                     "show_in_usd": show_in_usd,
                                     "usd_rub_rate": usd_rub,
                                     "btc_price_usd": btc_usd,
-                                    "scenarios": st.session_state.scenarios.copy()
-                                }
-                            }
-                            st.success(f"Результаты сохранены под названием: {result_name}")
-                            st.rerun()
-                    else:
-                        st.error("Введите название для сохранения")
-
-with tab2:
-    st.title("📁 Сохраненные результаты")
-    
-    if not st.session_state.get('saved_results', {}):
-        st.info("Нет сохраненных результатов")
-    else:
-        saved_results_copy = st.session_state.saved_results.copy()
-        
-        for name, data in saved_results_copy.items():
-            with st.expander(f"📌 {name} ({data['timestamp']})"):
-                st.write("Параметры расчета:")
-                st.json(data["params"])
-                
-                if "summary" in data:
-                    st.write("Сводные данные:")
-                    summary_df = pd.DataFrame(data["summary"])
-                    st.dataframe(summary_df.style.hide(axis="index"), hide_index=True, use_container_width=True)
-                
-                df = pd.DataFrame(data["data"])
-                show_in_usd_saved = data["params"].get("show_in_usd", False)
-                
-                display_columns = ["Месяц", "ASIC", "Доход", "Комиссия пула", "Электрика", "Расходы", 
-                                  "Прибыль", "Налог", "Чистая прибыль", "Зарплата", "Реинвест", 
-                                  "В кошелек", "Накопления", "Кошелек BTC"]
-                if show_in_usd_saved and "Кошелек USD" in df.columns:
-                    display_columns.append("Кошелек USD")
-                elif not show_in_usd_saved and "Кошелек RUB" in df.columns:
-                    display_columns.append("Кошелек RUB")
-                
-                if "Продажа по прогнозу" in df.columns:
-                    display_columns.append("Продажа по прогнозу")
-                
-                formatted_df = df[display_columns].copy()
-                for col in ["Доход", "Комиссия пула", "Электрика", "Расходы", "Прибыль", 
-                           "Налог", "Чистая прибыль", "Зарплата", "Реинвест", "В кошелек", "Накопления"]:
-                    if col in formatted_df.columns:
-                        formatted_df[col] = formatted_df[col].apply(lambda x: format_number(x, 0, "usd" if show_in_usd_saved else "rub"))
-                
-                st.dataframe(formatted_df, hide_index=True, use_container_width=True)
-                
-                if st.button(f"❌ Удалить {name}", key=f"delete_{name}"):
-                    del st.session_state.saved_results[name]
-                    st.rerun()
+                                   
