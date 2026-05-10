@@ -296,6 +296,11 @@ with tab1:
         )
         
         st.subheader("Прогнозы на конец расчетного периода")
+        
+        # Галочка для плавного повышения
+        smooth_increase = st.checkbox("Сделать плавное повышение курсов", value=False, key="smooth_increase",
+                                      help="Если включено, курсы BTC и USD будут плавно расти от текущих до прогнозируемых значений")
+        
         forecast_btc_price = st.number_input(
             "Прогноз цены Биткоина (тыс. $)",
             min_value=1.0,
@@ -379,13 +384,28 @@ with tab1:
 
     if st.button("Рассчитать", type="primary", use_container_width=True, key="calculate_btn"):
         with st.spinner("Выполняю расчет..."):
-            usd_rub = get_usd_rub_rate()
-            btc_usd = get_btc_price()
-            electricity_usd = electricity / usd_rub
+            # Получаем текущие курсы
+            current_usd_rub = get_usd_rub_rate()
+            current_btc_usd = get_btc_price()
             
+            # Прогнозные значения
             forecast_btc_price_usd = forecast_btc_price * 1000
             forecast_usd_rub_rate = forecast_usd_rub
             
+            # Определяем общее количество месяцев
+            total_months = max(s["end"] for s in st.session_state.scenarios) if st.session_state.scenarios else 36
+            
+            # Если включено плавное повышение, рассчитываем шаг изменения
+            if smooth_increase and total_months > 0:
+                btc_step = (forecast_btc_price_usd - current_btc_usd) / total_months
+                usd_step = (forecast_usd_rub_rate - current_usd_rub) / total_months
+            else:
+                btc_step = 0
+                usd_step = 0
+            
+            electricity_usd = electricity / current_usd_rub
+            
+            # Получаем данные с whattomine для 1 ASIC (используем текущий курс доллара)
             mining_data_per_asic = get_mining_data_with_retry(
                 asic_hashrate,
                 asic_power,
@@ -396,22 +416,17 @@ with tab1:
             daily_profit_per_asic_usd = mining_data_per_asic["daily_profit"]
             daily_cost_per_asic_usd = daily_revenue_per_asic_usd - daily_profit_per_asic_usd
             
-            daily_revenue_per_asic_rub = daily_revenue_per_asic_usd * usd_rub
-            daily_cost_per_asic_rub = daily_cost_per_asic_usd * usd_rub
-            
             current_asics = asic_count
             savings = 0
             wallet_btc = 0
             results = []
             
-            total_investment = asic_count * asic_price * usd_rub
+            total_investment = asic_count * asic_price * current_usd_rub
             total_investment_usd = asic_count * asic_price
             cumulative_profit_before_tax = 0
             cumulative_net_profit = 0
             break_even_month = None
             clean_break_even_month = None
-            
-            total_months = max(s["end"] for s in st.session_state.scenarios) if st.session_state.scenarios else 36
             
             halving_datetime = datetime.combine(halving_date, datetime.min.time())
             start_date = datetime.today()
@@ -431,23 +446,44 @@ with tab1:
                 
                 current_date = start_date + pd.DateOffset(months=month)
                 
+                # Определяем курсы для текущего месяца
+                if smooth_increase:
+                    month_btc_usd = current_btc_usd + btc_step * month
+                    month_usd_rub = current_usd_rub + usd_step * month
+                else:
+                    month_btc_usd = current_btc_usd
+                    month_usd_rub = current_usd_rub
+                
+                # Пересчитываем доходность в рублях с учетом текущего курса доллара
+                daily_revenue_per_asic_rub = daily_revenue_per_asic_usd * month_usd_rub
+                daily_cost_per_asic_rub = daily_cost_per_asic_usd * month_usd_rub
+                
+                # Доход при 100% аптайме
                 revenue_full = daily_revenue_per_asic_rub * 30 * current_asics
                 
+                # Рост сложности
                 difficulty_multiplier = (1 + difficulty_growth) ** (month - 1)
                 revenue_full = revenue_full / difficulty_multiplier if difficulty_multiplier > 0 else revenue_full
                 
+                # Халвинг
                 if current_date >= halving_datetime:
                     revenue_full = revenue_full * 0.5
                 
+                # Фактический доход с учетом аптайма
                 revenue = revenue_full * uptime
+                
+                # Потерянный доход из-за аптайма
                 lost_revenue = revenue_full - revenue
                 
+                # Расходы
                 pool_fee_amount = revenue * pool_fee
                 electricity_cost = daily_cost_per_asic_rub * 30 * current_asics
                 total_costs = pool_fee_amount + electricity_cost
                 
+                # Прибыль до налога
                 profit_before_tax = revenue - total_costs
                 
+                # Налог
                 if profit_before_tax > 0:
                     tax = profit_before_tax * tax_rate
                     net_profit = profit_before_tax - tax
@@ -455,44 +491,50 @@ with tab1:
                     tax = 0
                     net_profit = profit_before_tax
                 
+                # Распределение чистой прибыли
                 to_reinvest = net_profit * (reinvest_percent / 100)
                 salary = net_profit - to_reinvest
                 to_wallet = to_reinvest * (wallet_percent / 100)
                 to_asics = to_reinvest - to_wallet
                 
                 savings += to_asics
-                btc_amount = to_wallet / usd_rub / btc_usd
+                btc_amount = to_wallet / month_usd_rub / month_btc_usd
                 wallet_btc += btc_amount
                 
-                new_asics = int(savings // (asic_price * usd_rub))
+                # Покупка новых ASIC
+                new_asics = int(savings // (asic_price * month_usd_rub))
                 if new_asics > 0:
                     current_asics += new_asics
-                    savings -= new_asics * asic_price * usd_rub
-                    daily_revenue_per_asic_rub = (mining_data_per_asic["daily_revenue"] * usd_rub)
-                    daily_cost_per_asic_rub = (daily_revenue_per_asic_usd - daily_profit_per_asic_usd) * usd_rub
+                    savings -= new_asics * asic_price * month_usd_rub
+                    # Пересчитываем базовые значения
+                    daily_revenue_per_asic_rub = (mining_data_per_asic["daily_revenue"] * month_usd_rub)
+                    daily_cost_per_asic_rub = (daily_revenue_per_asic_usd - daily_profit_per_asic_usd) * month_usd_rub
                 
+                # Окупаемость по прибыли до налога
                 cumulative_profit_before_tax += profit_before_tax
                 investment_for_break_even = total_investment_usd if show_in_usd else total_investment
                 if cumulative_profit_before_tax >= investment_for_break_even and break_even_month is None:
                     break_even_month = month
                 
+                # Окупаемость по чистой прибыли
                 cumulative_net_profit += net_profit
                 if cumulative_net_profit >= investment_for_break_even and clean_break_even_month is None:
                     clean_break_even_month = month
                 
+                # Формирование результата
                 if show_in_usd:
-                    revenue_usd = revenue / usd_rub
-                    lost_revenue_usd = lost_revenue / usd_rub
-                    pool_fee_usd = pool_fee_amount / usd_rub
-                    electricity_usd_calc = electricity_cost / usd_rub
-                    total_costs_usd = total_costs / usd_rub
-                    profit_before_tax_usd = profit_before_tax / usd_rub
-                    tax_usd = tax / usd_rub
-                    net_profit_usd = net_profit / usd_rub
-                    salary_usd = salary / usd_rub
-                    to_reinvest_usd = to_reinvest / usd_rub
-                    to_wallet_usd = to_wallet / usd_rub
-                    savings_usd = savings / usd_rub
+                    revenue_usd = revenue / month_usd_rub
+                    lost_revenue_usd = lost_revenue / month_usd_rub
+                    pool_fee_usd = pool_fee_amount / month_usd_rub
+                    electricity_usd_calc = electricity_cost / month_usd_rub
+                    total_costs_usd = total_costs / month_usd_rub
+                    profit_before_tax_usd = profit_before_tax / month_usd_rub
+                    tax_usd = tax / month_usd_rub
+                    net_profit_usd = net_profit / month_usd_rub
+                    salary_usd = salary / month_usd_rub
+                    to_reinvest_usd = to_reinvest / month_usd_rub
+                    to_wallet_usd = to_wallet / month_usd_rub
+                    savings_usd = savings / month_usd_rub
                     
                     results.append({
                         "Месяц": month,
@@ -510,7 +552,7 @@ with tab1:
                         "В кошелек": int(to_wallet_usd),
                         "Накопления": int(savings_usd),
                         "Кошелек BTC": f"{wallet_btc:.8f} BTC",
-                        "Кошелек USD": format_number(wallet_btc * btc_usd, 2, 'usd')
+                        "Кошелек USD": format_number(wallet_btc * month_btc_usd, 2, 'usd')
                     })
                 else:
                     results.append({
@@ -529,13 +571,20 @@ with tab1:
                         "В кошелек": int(to_wallet),
                         "Накопления": int(savings),
                         "Кошелек BTC": f"{wallet_btc:.8f} BTC",
-                        "Кошелек RUB": format_number(wallet_btc * btc_usd * usd_rub, 0, 'rub')
+                        "Кошелек RUB": format_number(wallet_btc * month_btc_usd * month_usd_rub, 0, 'rub')
                     })
             
             if results:
                 last_month_btc = wallet_btc
-                forecast_value_usd = last_month_btc * forecast_btc_price_usd
-                forecast_value_rub = forecast_value_usd * forecast_usd_rub_rate
+                if smooth_increase:
+                    last_btc_usd = current_btc_usd + btc_step * total_months
+                    last_usd_rub = current_usd_rub + usd_step * total_months
+                else:
+                    last_btc_usd = forecast_btc_price_usd
+                    last_usd_rub = forecast_usd_rub_rate
+                
+                forecast_value_usd = last_month_btc * last_btc_usd
+                forecast_value_rub = forecast_value_usd * last_usd_rub
                 
                 if show_in_usd:
                     results[-1]["Продажа по прогнозу"] = format_number(forecast_value_usd, 0, 'usd')
@@ -663,11 +712,12 @@ with tab1:
                                     "tax_rate": tax_rate,
                                     "uptime": uptime,
                                     "halving_date": halving_date.isoformat(),
+                                    "smooth_increase": smooth_increase,
                                     "forecast_btc_price": forecast_btc_price,
                                     "forecast_usd_rub": forecast_usd_rub,
                                     "show_in_usd": show_in_usd,
-                                    "usd_rub_rate": usd_rub,
-                                    "btc_price_usd": btc_usd,
+                                    "usd_rub_rate": current_usd_rub,
+                                    "btc_price_usd": current_btc_usd,
                                     "scenarios": st.session_state.scenarios.copy()
                                 }
                             }
