@@ -196,14 +196,12 @@ def export_to_excel(df):
         workbook = writer.book
         worksheet = writer.sheets['Результаты майнинга']
         
-        # Форматируем заголовки
         for col in range(1, len(df.columns) + 1):
             cell = worksheet.cell(row=1, column=col)
             cell.font = openpyxl.styles.Font(bold=True, color="FFFFFF")
             cell.fill = openpyxl.styles.PatternFill(start_color="FF5757", end_color="FF5757", fill_type="solid")
             cell.alignment = openpyxl.styles.Alignment(horizontal="center")
         
-        # Автоматически подгоняем ширину колонок
         for column in worksheet.columns:
             max_length = 0
             column_letter = column[0].column_letter
@@ -295,6 +293,7 @@ with tab1:
         difficulty_growth = st.number_input("Рост сложности (% в месяц)", min_value=0.0, max_value=50.0, value=3.0, step=0.5, key="difficulty_growth") / 100
         pool_fee = st.number_input("Комиссия пула (%)", min_value=0.0, max_value=10.0, value=2.0, step=0.5, key="pool_fee") / 100
         tax_rate = st.number_input("Налог на прибыль (%)", min_value=0.0, max_value=50.0, value=13.0, step=1.0, key="tax_rate") / 100
+        uptime = st.number_input("Аптайм (%)", min_value=0.0, max_value=100.0, value=97.0, step=1.0, key="uptime") / 100
         
         st.subheader("Халвинг Bitcoin")
         halving_date = st.date_input(
@@ -441,13 +440,22 @@ with tab1:
                 
                 current_date = start_date + pd.DateOffset(months=month)
                 
-                revenue = daily_revenue_per_asic_rub * 30 * current_asics
+                # Доход при 100% аптайме
+                revenue_full = daily_revenue_per_asic_rub * 30 * current_asics
                 
+                # Рост сложности
                 difficulty_multiplier = (1 + difficulty_growth) ** (month - 1)
-                revenue = revenue / difficulty_multiplier if difficulty_multiplier > 0 else revenue
+                revenue_full = revenue_full / difficulty_multiplier if difficulty_multiplier > 0 else revenue_full
                 
+                # Халвинг
                 if current_date >= halving_datetime:
-                    revenue = revenue * 0.5
+                    revenue_full = revenue_full * 0.5
+                
+                # Фактический доход с учетом аптайма
+                revenue = revenue_full * uptime
+                
+                # Потерянный доход из-за аптайма
+                lost_revenue = revenue_full - revenue
                 
                 pool_fee_amount = revenue * pool_fee
                 electricity_cost = daily_cost_per_asic_rub * 30 * current_asics
@@ -489,6 +497,7 @@ with tab1:
                 
                 if show_in_usd:
                     revenue_usd = revenue / usd_rub
+                    lost_revenue_usd = lost_revenue / usd_rub
                     pool_fee_usd = pool_fee_amount / usd_rub
                     electricity_usd_calc = electricity_cost / usd_rub
                     total_costs_usd = total_costs / usd_rub
@@ -509,6 +518,7 @@ with tab1:
                         "Расходы": int(total_costs_usd),
                         "Прибыль": int(profit_before_tax_usd),
                         "Налог": int(tax_usd),
+                        "Потерянный доход": int(lost_revenue_usd),
                         "Чистая прибыль": int(net_profit_usd),
                         "Зарплата": int(salary_usd),
                         "Реинвест": int(to_reinvest_usd),
@@ -527,6 +537,7 @@ with tab1:
                         "Расходы": int(total_costs),
                         "Прибыль": int(profit_before_tax),
                         "Налог": int(tax),
+                        "Потерянный доход": int(lost_revenue),
                         "Чистая прибыль": int(net_profit),
                         "Зарплата": int(salary),
                         "Реинвест": int(to_reinvest),
@@ -583,6 +594,7 @@ with tab1:
                     "Общие расходы",
                     "Прибыль до налога",
                     "Общий налог",
+                    "Общий потерянный доход",
                     "Чистая прибыль",
                     "Финальное кол-во ASIC",
                     "Накоплено BTC"
@@ -597,6 +609,7 @@ with tab1:
                     format_number(df['Расходы'].sum(), 0, "usd" if show_in_usd else "rub"),
                     format_number(df['Прибыль'].sum(), 0, "usd" if show_in_usd else "rub"),
                     format_number(df['Налог'].sum(), 0, "usd" if show_in_usd else "rub"),
+                    format_number(df['Потерянный доход'].sum(), 0, "usd" if show_in_usd else "rub"),
                     format_number(df['Чистая прибыль'].sum(), 0, "usd" if show_in_usd else "rub"),
                     f"{df.iloc[-1]['ASIC']} шт.",
                     df.iloc[-1]['Кошелек BTC']
@@ -606,8 +619,8 @@ with tab1:
             st.dataframe(summary_df.style.hide(axis="index"), hide_index=True, use_container_width=True)
             
             display_columns = ["Месяц", "ASIC", "Доход", "Комиссия пула", "Электрика", "Расходы", 
-                              "Прибыль", "Налог", "Чистая прибыль", "Зарплата", "Реинвест", 
-                              "В кошелек", "Накопления", "Кошелек BTC"]
+                              "Прибыль", "Налог", "Потерянный доход", "Чистая прибыль", 
+                              "Зарплата", "Реинвест", "В кошелек", "Накопления", "Кошелек BTC"]
             if show_in_usd:
                 display_columns.append("Кошелек USD")
             else:
@@ -618,13 +631,14 @@ with tab1:
             
             formatted_df = df[display_columns].copy()
             for col in ["Доход", "Комиссия пула", "Электрика", "Расходы", "Прибыль", 
-                       "Налог", "Чистая прибыль", "Зарплата", "Реинвест", "В кошелек", "Накопления"]:
+                       "Налог", "Потерянный доход", "Чистая прибыль", "Зарплата", 
+                       "Реинвест", "В кошелек", "Накопления"]:
                 if col in formatted_df.columns:
                     formatted_df[col] = formatted_df[col].apply(lambda x: format_number(x, 0, "usd" if show_in_usd else "rub"))
             
             st.dataframe(formatted_df, hide_index=True, use_container_width=True, height=700)
             
-            # ========== КНОПКА ЭКСПОРТА В EXCEL ==========
+            # Кнопка экспорта в Excel
             col_export1, col_export2, col_export3 = st.columns([1, 2, 1])
             with col_export2:
                 if st.button("📥 Скачать результаты в Excel", type="secondary", use_container_width=True):
@@ -638,7 +652,6 @@ with tab1:
                             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                             use_container_width=True
                         )
-            # ===============================================
             
             with st.form("save_form"):
                 result_name = st.text_input("Название сохранения", 
@@ -662,6 +675,7 @@ with tab1:
                                     "difficulty_growth": difficulty_growth,
                                     "pool_fee": pool_fee,
                                     "tax_rate": tax_rate,
+                                    "uptime": uptime,
                                     "halving_date": halving_date.isoformat(),
                                     "forecast_btc_price": forecast_btc_price,
                                     "forecast_usd_rub": forecast_usd_rub,
@@ -698,8 +712,8 @@ with tab2:
                 show_in_usd_saved = data["params"].get("show_in_usd", False)
                 
                 display_columns = ["Месяц", "ASIC", "Доход", "Комиссия пула", "Электрика", "Расходы", 
-                                  "Прибыль", "Налог", "Чистая прибыль", "Зарплата", "Реинвест", 
-                                  "В кошелек", "Накопления", "Кошелек BTC"]
+                                  "Прибыль", "Налог", "Потерянный доход", "Чистая прибыль", 
+                                  "Зарплата", "Реинвест", "В кошелек", "Накопления", "Кошелек BTC"]
                 if show_in_usd_saved and "Кошелек USD" in df.columns:
                     display_columns.append("Кошелек USD")
                 elif not show_in_usd_saved and "Кошелек RUB" in df.columns:
@@ -710,12 +724,4 @@ with tab2:
                 
                 formatted_df = df[display_columns].copy()
                 for col in ["Доход", "Комиссия пула", "Электрика", "Расходы", "Прибыль", 
-                           "Налог", "Чистая прибыль", "Зарплата", "Реинвест", "В кошелек", "Накопления"]:
-                    if col in formatted_df.columns:
-                        formatted_df[col] = formatted_df[col].apply(lambda x: format_number(x, 0, "usd" if show_in_usd_saved else "rub"))
-                
-                st.dataframe(formatted_df, hide_index=True, use_container_width=True)
-                
-                if st.button(f"❌ Удалить {name}", key=f"delete_{name}"):
-                    del st.session_state.saved_results[name]
-                    st.rerun()
+                           "
