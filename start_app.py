@@ -186,7 +186,7 @@ def remove_scenario(index):
         st.session_state.scenarios[i]["end"] = st.session_state.scenarios[i]["start"] + 11
 
 # --- Функция для экспорта в Excel ---
-def export_to_excel(df, filename="mining_results.xlsx"):
+def export_to_excel(df):
     """Экспортирует DataFrame в Excel с форматированием"""
     output = BytesIO()
     
@@ -245,146 +245,34 @@ st.set_page_config(
     layout="wide"
 )
 
-# ========== ЗАГОЛОВОК С ЛОГОТИПОМ (ЦЕНТР, логотип сверху) ==========
+# ========== ЗАГОЛОВОК С ЛОГОТИПОМ ==========
 col1, col2, col3 = st.columns([1, 2, 1])
 with col2:
-    col_logo, col_text, col_empty = st.columns([2.5, 3, 0.5])
-    with col_logo:
-        st.image("89120564-6.png", width=300)
-    with col_text:
-        st.markdown("<h1 style='margin: 0; text-align: center;'>Калькулятор от Gazminer</h1>", unsafe_allow_html=True)
-    with col_empty:
-        st.write("")
+    st.image("89120564-6.png", width=100)
+    st.markdown("<h1 style='text-align: center;'>Калькулятор от Gazminer</h1>", unsafe_allow_html=True)
 st.markdown("---")
-# ===================================================
+# ===========================================
 
 # ========== КАСТОМНЫЙ ДИЗАЙН ==========
 st.markdown("""
 <style>
-    /* Основной фон страницы */
-    .stApp {
-        background-color: #1a1a1a !important;
-    }
-    
-    /* Все тексты белые */
-    .stMarkdown, .stText, .stNumberInput label, .stCheckbox label, .stSelectbox label, .stDateInput label {
-        color: white !important;
-    }
-    
-    /* Заголовки - h1 белый, остальные бирюзовые */
-    h1 {
-        color: white !important;
-    }
-    h2, h3, .stHeader {
-        color: #2cb1c3 !important;
-    }
-    
-    /* Кнопки - красные */
-    .stButton button {
-        background-color: #ff5757 !important;
-        color: white !important;
-        border: none !important;
-        border-radius: 8px !important;
-        padding: 8px 16px !important;
-        font-weight: bold !important;
-        transition: all 0.3s ease !important;
-    }
-    .stButton button:hover {
-        background-color: #ff3333 !important;
-        transform: scale(1.02) !important;
-        box-shadow: 0 2px 10px rgba(255, 87, 87, 0.3) !important;
-    }
-    
-    /* Рамки полей ввода - БИРЮЗОВЫЕ */
-    .stNumberInput input, .stTextInput input, .stDateInput input, .stSelectbox select {
-        border: 2px solid #2cb1c3 !important;
-        border-radius: 8px !important;
-        background-color: #2a2a2a !important;
-        color: white !important;
-    }
-    .stNumberInput input:focus, .stTextInput input:focus, .stDateInput input:focus {
-        border-color: #ff5757 !important;
-        outline: none !important;
-        box-shadow: 0 0 8px rgba(44, 177, 195, 0.5) !important;
-    }
-    
-    /* Слайдеры */
-    .stSlider .stSlider-track {
-        background-color: #2cb1c3 !important;
-    }
-    .stSlider .stSlider-thumb {
-        background-color: #ff5757 !important;
-    }
-    
-    /* Метрики */
-    [data-testid="stMetric"] {
-        background-color: #2a2a2a !important;
-        border-radius: 10px !important;
-        padding: 10px !important;
-        border-left: 4px solid #ff5757 !important;
-    }
-    [data-testid="stMetricLabel"] {
-        color: white !important;
-    }
-    [data-testid="stMetricValue"] {
-        color: #ff5757 !important;
-    }
-    
-    /* Информационные сообщения */
-    .stAlert {
-        background-color: #2a2a2a !important;
-        border-left-color: #ff5757 !important;
-        color: white !important;
-    }
-    .stAlert p {
-        color: white !important;
-    }
-    
-    /* Контейнеры с рамкой */
-    .stContainer {
-        background-color: #2a2a2a !important;
-        border-radius: 12px !important;
-        padding: 15px !important;
-        border: 1px solid #2cb1c3 !important;
-    }
-    
-    /* Вкладки */
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 8px !important;
-    }
-    .stTabs [data-baseweb="tab"] {
-        background-color: #2a2a2a !important;
-        border-radius: 8px !important;
-        padding: 8px 16px !important;
-        color: white !important;
-    }
-    .stTabs [aria-selected="true"] {
-        background-color: #ff5757 !important;
-        color: white !important;
-    }
-    
-    /* Чекбокс */
-    .stCheckbox label span {
-        color: white !important;
-    }
-    
-    /* Спиннер */
-    .stSpinner > div {
-        border-top-color: #ff5757 !important;
-    }
-    
-    /* Таблицы */
-    div[data-testid="stDataFrame"] {
-        background-color: #2a2a2a !important;
-    }
-    div[data-testid="stDataFrame"] tbody tr td {
-        background-color: #2a2a2a !important;
-        color: white !important;
-    }
-    div[data-testid="stDataFrame"] thead tr th {
-        background-color: #ff5757 !important;
-        color: white !important;
-    }
+    .stApp { background-color: #1a1a1a !important; }
+    .stMarkdown, .stText, .stNumberInput label, .stCheckbox label, .stSelectbox label, .stDateInput label { color: white !important; }
+    h1 { color: white !important; }
+    h2, h3, .stHeader { color: #2cb1c3 !important; }
+    .stButton button { background-color: #ff5757 !important; color: white !important; border: none !important; border-radius: 8px !important; padding: 8px 16px !important; font-weight: bold !important; }
+    .stButton button:hover { background-color: #ff3333 !important; }
+    .stNumberInput input, .stTextInput input, .stDateInput input, .stSelectbox select { border: 2px solid #2cb1c3 !important; border-radius: 8px !important; background-color: #2a2a2a !important; color: white !important; }
+    [data-testid="stMetric"] { background-color: #2a2a2a !important; border-radius: 10px !important; padding: 10px !important; border-left: 4px solid #ff5757 !important; }
+    [data-testid="stMetricLabel"] { color: white !important; }
+    [data-testid="stMetricValue"] { color: #ff5757 !important; }
+    .stAlert { background-color: #2a2a2a !important; border-left-color: #ff5757 !important; color: white !important; }
+    .stContainer { background-color: #2a2a2a !important; border-radius: 12px !important; padding: 15px !important; border: 1px solid #2cb1c3 !important; }
+    .stTabs [data-baseweb="tab"] { background-color: #2a2a2a !important; border-radius: 8px !important; padding: 8px 16px !important; color: white !important; }
+    .stTabs [aria-selected="true"] { background-color: #ff5757 !important; color: white !important; }
+    div[data-testid="stDataFrame"] { background-color: #2a2a2a !important; }
+    div[data-testid="stDataFrame"] tbody tr td { background-color: #2a2a2a !important; color: white !important; }
+    div[data-testid="stDataFrame"] thead tr th { background-color: #ff5757 !important; color: white !important; }
 </style>
 """, unsafe_allow_html=True)
 # ===================================================
@@ -741,22 +629,8 @@ with tab1:
             with col_export2:
                 if st.button("📥 Скачать результаты в Excel", type="secondary", use_container_width=True):
                     with st.spinner("Подготавливаю файл..."):
-                        # Подготавливаем DataFrame для экспорта
                         export_df = df[display_columns].copy()
-                        # Убираем символы валют и преобразуем в числа
-                        for col in ["Доход", "Комиссия пула", "Электрика", "Расходы", "Прибыль", 
-                                   "Налог", "Чистая прибыль", "Зарплата", "Реинвест", "В кошелек", "Накопления"]:
-                            if col in export_df.columns:
-                                try:
-                                    # Пробуем преобразовать в число
-                                    export_df[col] = pd.to_numeric(export_df[col], errors='coerce')
-                                except:
-                                    pass
-                        
-                        # Создаем Excel файл
                         excel_file = export_to_excel(export_df)
-                        
-                        # Предлагаем скачать
                         st.download_button(
                             label="📊 Скачать Excel файл",
                             data=excel_file,
@@ -794,4 +668,54 @@ with tab1:
                                     "show_in_usd": show_in_usd,
                                     "usd_rub_rate": usd_rub,
                                     "btc_price_usd": btc_usd,
-                                   
+                                    "scenarios": st.session_state.scenarios.copy()
+                                }
+                            }
+                            st.success(f"Результаты сохранены под названием: {result_name}")
+                            st.rerun()
+                    else:
+                        st.error("Введите название для сохранения")
+
+with tab2:
+    st.title("📁 Сохраненные результаты")
+    
+    if not st.session_state.get('saved_results', {}):
+        st.info("Нет сохраненных результатов")
+    else:
+        saved_results_copy = st.session_state.saved_results.copy()
+        
+        for name, data in saved_results_copy.items():
+            with st.expander(f"📌 {name} ({data['timestamp']})"):
+                st.write("Параметры расчета:")
+                st.json(data["params"])
+                
+                if "summary" in data:
+                    st.write("Сводные данные:")
+                    summary_df = pd.DataFrame(data["summary"])
+                    st.dataframe(summary_df.style.hide(axis="index"), hide_index=True, use_container_width=True)
+                
+                df = pd.DataFrame(data["data"])
+                show_in_usd_saved = data["params"].get("show_in_usd", False)
+                
+                display_columns = ["Месяц", "ASIC", "Доход", "Комиссия пула", "Электрика", "Расходы", 
+                                  "Прибыль", "Налог", "Чистая прибыль", "Зарплата", "Реинвест", 
+                                  "В кошелек", "Накопления", "Кошелек BTC"]
+                if show_in_usd_saved and "Кошелек USD" in df.columns:
+                    display_columns.append("Кошелек USD")
+                elif not show_in_usd_saved and "Кошелек RUB" in df.columns:
+                    display_columns.append("Кошелек RUB")
+                
+                if "Продажа по прогнозу" in df.columns:
+                    display_columns.append("Продажа по прогнозу")
+                
+                formatted_df = df[display_columns].copy()
+                for col in ["Доход", "Комиссия пула", "Электрика", "Расходы", "Прибыль", 
+                           "Налог", "Чистая прибыль", "Зарплата", "Реинвест", "В кошелек", "Накопления"]:
+                    if col in formatted_df.columns:
+                        formatted_df[col] = formatted_df[col].apply(lambda x: format_number(x, 0, "usd" if show_in_usd_saved else "rub"))
+                
+                st.dataframe(formatted_df, hide_index=True, use_container_width=True)
+                
+                if st.button(f"❌ Удалить {name}", key=f"delete_{name}"):
+                    del st.session_state.saved_results[name]
+                    st.rerun()
